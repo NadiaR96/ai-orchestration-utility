@@ -1,0 +1,61 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.env/
+.env.*
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# Logs
+*.log
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# VS Code / IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment variables / secrets
+.env
+.env.local
+
+# Hugging Face cache
+.cache/
+.huggingface/
+
+# PyTorch / model weights (optional - avoids huge files)
+*.pt
+*.bin
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+crash.log
+
+# Docker
+*.dockerignore
+
+# Test / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Misc
+*.swp
+
+# Local Hugging Face models and data (optional - avoids large files)
+models/
+data/
