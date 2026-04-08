@@ -21,27 +21,33 @@ class Orchestrator:
         embedding = self.embedding_model.encode(task["input"])
         logging.info(f"Embedding vector length: {len(embedding)}")
 
-        # Track latency of LLM agent
+        # Track latency of agent
         output, latency = self.metrics.track_latency(self.agent.run, task["input"])
-        logging.info("Agent execution complete")
 
         # Evaluate output
         evaluation = self.evaluator.evaluate(task["input"], output)
 
-        # Metrics computation (if reference available)
-        reference = task.get("reference", "")
-        metrics = {"latency": latency, "memory_usage_mb": self.metrics.memory_usage()}
+        # Metrics
+        metrics = {
+            "latency": latency,
+            "memory_usage_mb": self.metrics.memory_usage()
+        }
 
+        reference = task.get("reference", "")
         if reference:
+            ref_tokens = reference.split()
             metrics.update({
                 "BERTScore": self.metrics.bert_score(output, reference),
                 "METEOR": self.metrics.meteor(output, reference),
                 "ROUGE": self.metrics.rouge(output, reference),
                 "BLEU": self.metrics.bleu(output, reference),
-                "HallucinationRate": self.metrics.hallucination_rate(output, reference.split())
+                "HallucinationRate": self.metrics.hallucination_rate(output, ref_tokens),
+                "F1_Precision_Recall": self.metrics.f1_precision_recall(ref_tokens, output.split()),
+                "Diversity": self.metrics.diversity_score(output),
+                "Coverage": self.metrics.coverage_score(output, ref_tokens)
             })
 
-        # Optional: token cost estimation
+        # Token cost if available
         if "num_tokens" in task:
             metrics["token_cost_usd"] = self.metrics.estimate_token_cost(task["num_tokens"])
 
