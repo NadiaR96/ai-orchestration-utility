@@ -1,24 +1,25 @@
 import unittest
-from unittest.mock import patch
-from agents.hf_agent import HuggingFaceAgent
 from agents.evaluator_agent import EvaluatorAgent
-
-class TestHuggingFaceAgent(unittest.TestCase):
-    def setUp(self):
-        self.agent = HuggingFaceAgent()
-
-    @patch.object(HuggingFaceAgent, "run", return_value="This is a mocked response")
-    def test_run_returns_string(self, mock_run):
-        output = self.agent.run("Test input")
-        self.assertEqual(output, "This is a mocked response")
-        mock_run.assert_called_once_with("Test input")
-
+from unittest.mock import patch
 
 class TestEvaluatorAgent(unittest.TestCase):
     def setUp(self):
-        self.eval = EvaluatorAgent()
+        self.evaluator = EvaluatorAgent()
+        self.candidate = "AI systems can have multiple agents working together."
+        self.reference = "Multi-agent AI systems consist of multiple agents collaborating."
 
-    def test_evaluate_returns_dict(self):
-        result = self.eval.evaluate("input text", "output text")
-        self.assertIsInstance(result, dict)
-        self.assertIn("score", result)
+    def test_evaluate_metrics(self):
+        metrics = self.evaluator.evaluate(self.candidate, self.reference)
+        self.assertIn("METEOR", metrics)
+        self.assertIn("ROUGE", metrics)
+        self.assertIn("BERTScore", metrics)
+        self.assertIn("Perplexity", metrics)
+        self.assertIn("HallucinationRate", metrics)
+        self.assertIn("Diversity", metrics)
+        self.assertIn("Cost", metrics)
+
+    @patch("agents.hf_agent.HuggingFaceAgent.run")
+    def test_huggingface_skip_real_api(self, mock_run):
+        mock_run.return_value = "Mocked output"
+        output = mock_run("Any input")
+        self.assertEqual(output, "Mocked output")

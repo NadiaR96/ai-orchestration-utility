@@ -1,81 +1,49 @@
-# metrics/metrics_tracker.py
 import nltk
-from nltk.translate.bleu_score import sentence_bleu
 from nltk.translate.meteor_score import single_meteor_score
-from rouge import Rouge
-from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.feature_extraction.text import TfidfVectorizer
-import numpy as np
+from rouge_score import rouge_scorer
+from bert_score import score as bert_score
+import time
+import math
 
-# Ensure tokenizer is downloaded
-nltk.download("punkt", quiet=True)
+# Ensure punkt tokenizer is available
+nltk.download('punkt', quiet=True)
 
 class MetricsTracker:
     def __init__(self):
-        self.rouge = Rouge()
-        self.vectorizer = TfidfVectorizer()
+        self.rouge = rouge_scorer.RougeScorer(['rouge1', 'rougeL'], use_stemmer=True)
 
-    # -----------------------------
-    # BLEU Score
-    # -----------------------------
-    def bleu(self, candidate, reference):
-        reference_tokens = nltk.word_tokenize(reference)
-        candidate_tokens = nltk.word_tokenize(candidate)
-        return sentence_bleu([reference_tokens], candidate_tokens)
-
-    # -----------------------------
-    # METEOR Score
-    # -----------------------------
+    # Standard metrics
     def meteor(self, candidate, reference):
-        ref_tokens = nltk.word_tokenize(reference)
-        cand_tokens = nltk.word_tokenize(candidate)
-        return single_meteor_score(ref_tokens, cand_tokens)
+        candidate_tokens = nltk.word_tokenize(candidate)
+        reference_tokens = nltk.word_tokenize(reference)
+        return single_meteor_score(reference_tokens, candidate_tokens)
 
-    # -----------------------------
-    # ROUGE Score
-    # -----------------------------
-    def rouge_score(self, candidate, reference):
-        return self.rouge.get_scores(candidate, reference)[0]
+    def rouge(self, candidate, reference):
+        return self.rouge.score(reference, candidate)
 
-    # -----------------------------
-    # Cosine Similarity
-    # -----------------------------
-    def cosine_similarity_score(self, candidate, reference):
-        tfidf = self.vectorizer.fit_transform([candidate, reference])
-        return cosine_similarity(tfidf[0:1], tfidf[1:2])[0][0]
+    def bert_score(self, candidates, references, model_type='bert-base-uncased'):
+        P, R, F1 = bert_score(candidates, references, lang='en', model_type=model_type)
+        return F1.mean().item()
 
-    # -----------------------------
-    # Diversity Score (unique tokens / total tokens)
-    # -----------------------------
-    def diversity_score(self, text):
-        tokens = nltk.word_tokenize(text)
-        return len(set(tokens)) / max(len(tokens), 1)
+    def perplexity(self, candidate, reference):
+        # Simple pseudo-perplexity
+        candidate_tokens = nltk.word_tokenize(candidate)
+        ref_tokens = set(nltk.word_tokenize(reference))
+        prob = sum(1 for t in candidate_tokens if t in ref_tokens) / len(candidate_tokens)
+        return math.exp(-math.log(prob+1e-8))
 
-    # -----------------------------
-    # Coverage Score (overlap with reference)
-    # -----------------------------
-    def coverage_score(self, candidate, reference_tokens):
-        candidate_tokens = set(nltk.word_tokenize(candidate))
-        reference_tokens = set(reference_tokens)
-        return len(candidate_tokens & reference_tokens) / max(len(reference_tokens), 1)
-
-    # -----------------------------
-    # Hallucination Rate
-    # -----------------------------
+    # Custom metrics
     def hallucination_rate(self, candidate, reference_tokens):
         candidate_tokens = set(nltk.word_tokenize(candidate))
-        reference_tokens = set(reference_tokens)
-        hallucinated = candidate_tokens - reference_tokens
-        return len(hallucinated) / max(len(candidate_tokens), 1)
+        hallucinated = candidate_tokens - set(reference_tokens)
+        return len(hallucinated) / max(1, len(candidate_tokens))
 
-    # -----------------------------
-    # F1, Precision, Recall
-    # -----------------------------
-    def f1_precision_recall(self, reference_tokens, candidate_tokens):
-        ref_set = set(reference_tokens)
-        cand_set = set(candidate_tokens)
-        tp = len(ref_set & cand_set)
-        precision = tp / max(len(cand_set), 1)
-        recall = tp / max(len(ref_set), 1)
-        f1 = (2 * precision * recall) / max(precision + recall, 1e-8)
-        return {"F1": f1, "Precision": precision, "Recall": recall}
+    def diversity_score(self, text):
+        tokens = nltk.word_tokenize(text)
+        return len(set(tokens)) / max(1, len(tokens))
+
+    def latency(self, start_time, end_time):
+        return end_time - start_time
+
+    def cost_estimate(self, tokens_processed, cost_per_token=0.00001):
+        return tokens_processed * cost_per_token

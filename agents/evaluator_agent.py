@@ -1,27 +1,21 @@
+from metrics.metrics_tracker import MetricsTracker
+import time
+
 class EvaluatorAgent:
-    """
-    Evaluates outputs from other agents and returns a score or feedback.
-    """
     def __init__(self):
-        pass
+        self.metrics = MetricsTracker()
 
-    def evaluate(self, input_text: str, agent_output: str) -> dict:
-        """
-        Simple scoring example:
-        - Checks length
-        - Simple keyword presence
-        """
-        score = 0
-        feedback = []
-
-        if len(agent_output.split()) > 5:
-            score += 1
-        else:
-            feedback.append("Output too short.")
-
-        if "AI" in agent_output:
-            score += 1
-        else:
-            feedback.append("Missing key term 'AI'.")
-
-        return {"score": score, "feedback": feedback}
+    def evaluate(self, candidate, reference, start_time=None, end_time=None):
+        ref_tokens = nltk.word_tokenize(reference)
+        results = {
+            "METEOR": self.metrics.meteor(candidate, reference),
+            "ROUGE": self.metrics.rouge(candidate, reference),
+            "BERTScore": self.metrics.bert_score([candidate], [reference]),
+            "Perplexity": self.metrics.perplexity(candidate, reference),
+            "HallucinationRate": self.metrics.hallucination_rate(candidate, ref_tokens),
+            "Diversity": self.metrics.diversity_score(candidate),
+        }
+        if start_time and end_time:
+            results["Latency"] = self.metrics.latency(start_time, end_time)
+        results["Cost"] = self.metrics.cost_estimate(len(candidate.split()))
+        return results
