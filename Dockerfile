@@ -1,17 +1,18 @@
 # Dockerfile
 FROM python:3.11-slim
 
-# Set workdir
 WORKDIR /app
 
-# Copy requirements
+# 1️⃣ Install dependencies
 COPY requirements.txt .
-
-# Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy repo files
+# 2️⃣ Copy and run NLTK setup
+COPY utils/setup_nltk.py ./utils/
+RUN python ./utils/setup_nltk.py
+
+# 3️⃣ Copy repo files
 COPY . .
 
-# Default command (run tests)
-CMD ["python", "-m", "unittest", "discover", "-s", "tests"]
+# 4️⃣ Default command: run all unit tests (excludes integration)
+CMD ["python", "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py"]

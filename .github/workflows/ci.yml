@@ -1,3 +1,4 @@
+# .github/workflows/ci.yml
 name: CI/CD Pipeline
 
 on:
@@ -11,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # 1️⃣ Checkout the code
+    # 1️⃣ Checkout code
     - name: Checkout code
       uses: actions/checkout@v3
 
@@ -27,15 +28,18 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    # 4️⃣ Run unit tests only (exclude integration)
-    - name: Run unit tests
-      run: |
-        python -m unittest discover -s tests -p "test_*.py" -v
+    # 4️⃣ Setup NLTK resources
+    - name: Setup NLTK
+      run: python utils/setup_nltk.py
 
-    # 5️⃣ Optional: Build Docker image
-    - name: Build Docker Image
+    # 5️⃣ Run unit tests only (exclude integration)
+    - name: Run unit tests
+      run: python -m unittest discover -s tests -p "test_*.py" -v
+
+    # 6️⃣ Build Docker image
+    - name: Build Docker image
       run: docker build -t ai-orchestration-utility:latest .
 
-    # 6️⃣ Optional: Run Docker container to execute tests
+    # 7️⃣ Run Docker container to verify tests
     - name: Run Docker container
       run: docker run --rm ai-orchestration-utility:latest

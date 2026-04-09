@@ -1,143 +1,109 @@
 # AI Orchestration Utility
 
-A lightweight, modular **AI orchestration utility** designed to simulate production-ready multi-agent systems.  
-This project integrates **Hugging Face models**, **RAG-style embeddings**, and **structured orchestration logic** to demonstrate how modern AI systems are built and managed.
+[![Python](https://img.shields.io/badge/python-3.11-blue)](https://www.python.org/)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
+A lightweight **multi-agent AI orchestration platform** with metrics tracking, Docker, and CI/CD integration.  
+Designed for **production-ready experimentation with LLMs**, evaluation of outputs, and orchestration of complex AI tasks.
 
 ---
 
-## 🚀 Overview
+## **🚀 Features**
 
-This utility is a simplified but **production-inspired framework** for orchestrating AI agents.
+- **Multi-Agent Orchestration**  
+  Run multiple instances of AI agents concurrently with flexible task assignment.
 
-It demonstrates:
+- **Metrics Tracking**  
+  Evaluate AI outputs using:
+  - BLEU  
+  - METEOR  
+  - ROUGE  
+  - Cosine Similarity  
+  - Diversity Score  
+  - Coverage Score  
+  - Hallucination Rate  
+  - F1, Precision, Recall  
 
-- Multi-agent task orchestration
-- Hugging Face-powered LLM integration
-- Embedding-based processing (RAG foundation)
-- Modular, extensible architecture
-- Observability via logging
+- **Dockerized Environment**  
+  Fully reproducible builds, including NLTK resources.
 
-This project is part of a broader ecosystem including:
-- Multi-agent AI platform
-- Analytical RAG systems
-- Cloud-native orchestration design
+- **CI/CD Ready**  
+  - Unit tests run automatically on GitHub Actions  
+  - Integration tests run locally (excluded from CI/CD for speed)  
 
----
-
-## 🧠 Architecture
-
-
-User Input
-↓
-Orchestrator
-↓
-+----------------------+
-| Hugging Face Agent |
-| (LLM Processing) |
-+----------------------+
-↓
-Embedding Layer (RAG)
-↓
-Output + Logging
-
+- **Extensible**  
+  Add new agents, metrics, or connectors with minimal effort.
 
 ---
 
-## ⚙️ Features
-
-- **AI Agent Integration**
-  - Powered by Hugging Face Transformers
-  - Easily swappable models
-
-- **RAG Foundations**
-  - Embeddings via sentence-transformers
-  - Ready for vector database integration
-
-- **Orchestration Layer**
-  - Central task coordination
-  - Extensible agent design
-
-- **Observability**
-  - Structured logging for tracing execution
-
-- **Modular Design**
-  - Clean separation of concerns
-  - Easy to extend with new agents or pipelines
-
----
-
-## 📁 Project Structure
+## **📂 Repository Structure**
 
 
-utility/
-├── main.py
-├── orchestrator.py
-├── agents/
-│ └── hf_agent.py
-├── rag/
-│ └── embeddings.py
-├── requirements.txt
+ai-orchestration-utility/
+├─ orchestrator.py
+├─ metrics/
+│ └─ metrics_tracker.py
+├─ agents/
+│ └─ ...
+├─ tests/
+│ ├─ test_agents.py
+│ ├─ test_metrics.py
+│ ├─ test_orchestrator.py
+│ └─ test_agents_integration.py
+├─ utils/
+│ └─ setup_nltk.py
+├─ requirements.txt
+├─ Dockerfile
+└─ README.md
 
+
+- `utils/setup_nltk.py` → Ensures NLTK data (e.g., `punkt`) is available locally or in Docker.  
+- `tests/` → Unit tests run in CI/CD; integration tests are optional.  
 
 ---
 
-## 🛠️ Installation
+## **⚡ Quick Start**
+
+### **1️⃣ Clone the repo**
 
 ```bash
 git clone https://github.com/NadiaR96/ai-orchestration-utility.git
 cd ai-orchestration-utility
-
+2️⃣ Install Python dependencies
 pip install -r requirements.txt
-▶️ Usage
-python main.py
+3️⃣ Setup NLTK data
+python utils/setup_nltk.py
+4️⃣ Run unit tests
+python -m unittest discover -s tests -p "test_*.py"
+5️⃣ Optional: Run in Docker
+docker build -t ai-orchestration-utility:latest .
+docker run --rm ai-orchestration-utility:latest
+6️⃣ Run integration tests locally (optional)
+python -m unittest discover -s tests -p "test_agents_integration.py"
+🛠️ CI/CD Workflow
+Runs on push or pull request to main branch
+Steps:
+Checkout code
+Setup Python
+Install dependencies
+Setup NLTK resources
+Run unit tests only
+Build Docker image
+Run Docker container for verification
 
-Example output:
+Integration tests are excluded from CI/CD to keep pipelines fast.
 
-=== RESULT ===
-Multi-agent AI systems are systems where multiple AI agents collaborate...
-🔌 Hugging Face Integration
+📈 Extending the Platform
+Add new agents → Place in agents/ and update orchestrator
+Add new metrics → Add to metrics/metrics_tracker.py
+Hugging Face integration → Replace placeholder agent logic with HF models
+Monitoring & Logging → Extend orchestrator to track latency, cost, hallucination live
+🎯 Why This Project Matters
+Demonstrates multi-agent orchestration and RAG architecture
+Provides production-ready evaluation metrics
+Shows modern engineering skills: Docker, CI/CD, testing
+Perfect for portfolio, blog posts, and interview demos
+📄 License
 
-This project uses Hugging Face for:
-
-Text generation (LLM agents)
-Embeddings for RAG workflows
-
-You can easily swap models:
-
-HuggingFaceAgent(model_name="gpt2")
-
-Or upgrade to more advanced models from the Hugging Face Hub.
-
-🧩 Extending the Utility
-
-This project is designed to be extended. Possible enhancements include:
-
-Vector database integration (FAISS, Chroma)
-Multi-agent coordination (multiple agent roles)
-API layer (FastAPI)
-CI/CD pipelines
-Terraform-based infrastructure provisioning
-Deployment to cloud or container environments
-📊 Why This Project
-
-Modern AI systems are no longer single models — they are orchestrated systems combining:
-
-Multiple agents
-Retrieval pipelines (RAG)
-Observability and monitoring
-Scalable infrastructure
-
-This utility demonstrates those principles in a lightweight, practical format.
-
-🧑‍💻 Author
-
-Nadia Rodgers
-Senior AI Engineer | Multi-Agent Systems | Cloud-Native AI
-
-📌 Related Projects
-Enterprise Agentic AI Platform
-Race Management System (RAG + Analytics)
-⭐ Future Work
-Multi-agent evaluation framework
-AI observability dashboard
-Multi-cloud routing (AWS / Azure / Hugging Face)
+MIT License. See LICENSE
+ for details.
