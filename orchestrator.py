@@ -17,15 +17,18 @@ class Orchestrator:
     def process_task(self, task: dict):
         logging.info(f"Received task: {task}")
 
+        task_input = task.get("input", task.get("prompt", ""))
+        reference = task.get("reference", task_input)
+
         # Generate embedding
-        embedding = self.embedding_model.encode(task["input"])
+        embedding = self.embedding_model.encode(task_input)
         logging.info(f"Embedding vector length: {len(embedding)}")
 
         # Track latency of agent
-        output, latency = self.metrics.track_latency(self.agent.run, task["input"])
+        output, latency = self.metrics.track_latency(self.agent.run, task_input)
 
         # Evaluate output
-        evaluation = self.evaluator.evaluate(task["input"], output)
+        evaluation = self.evaluator.evaluate(output, reference)
 
         # Metrics
         metrics = {
@@ -33,11 +36,10 @@ class Orchestrator:
             "memory_usage_mb": self.metrics.memory_usage()
         }
 
-        reference = task.get("reference", "")
         if reference:
             ref_tokens = reference.split()
             metrics.update({
-                "BERTScore": self.metrics.bert_score(output, reference),
+                "BERTScore": self.metrics.bert_score([output], [reference]),
                 "METEOR": self.metrics.meteor(output, reference),
                 "ROUGE": self.metrics.rouge(output, reference),
                 "BLEU": self.metrics.bleu(output, reference),
@@ -51,10 +53,12 @@ class Orchestrator:
         if "num_tokens" in task:
             metrics["token_cost_usd"] = self.metrics.estimate_token_cost(task["num_tokens"])
 
-        return {
-            "input": task["input"],
+        result = {
+            "input": task_input,
             "output": output,
             "embedding_sample": embedding[:5].tolist(),
             "evaluation": evaluation,
             "metrics": metrics
         }
+        result.update(evaluation)
+        return result

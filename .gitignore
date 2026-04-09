@@ -59,3 +59,6 @@ htmlcov/
 # Local Hugging Face models and data (optional - avoids large files)
 models/
 data/
+
+#Virtual environment
+.venv/
