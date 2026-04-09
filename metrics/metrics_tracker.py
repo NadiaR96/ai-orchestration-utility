@@ -3,7 +3,7 @@ from collections import Counter
 from nltk.translate.meteor_score import single_meteor_score
 from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 from rouge_score import rouge_scorer
-from bert_score import score as bert_score
+from bert_score import score as bert_score_fn
 import psutil
 import time
 import math
@@ -54,11 +54,12 @@ class MetricsTracker:
         return single_meteor_score(reference_tokens, candidate_tokens)
 
     def rouge(self, candidate, reference):
-        return self._rouge_scorer.score(reference, candidate)
+        scores = self._rouge_scorer.score(reference, candidate)
+        return {k: v.fmeasure for k, v in scores.items()}
 
     def bert_score(self, candidates, references, model_type='bert-base-uncased'):
-        P, R, F1 = bert_score(candidates, references, lang='en', model_type=model_type)
-        return F1.mean().item()
+        P, R, F1 = bert_score_fn(candidates, references, lang='en', model_type=model_type)
+        return float(F1.mean().item())
 
     def perplexity(self, candidate, reference):
         # Simple pseudo-perplexity

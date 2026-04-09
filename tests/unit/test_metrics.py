@@ -37,7 +37,7 @@ class TestMetricsTracker(unittest.TestCase):
         import time
         start, end = time.time(), time.time() + 1
         latency = self.metrics.latency(start, end)
-        self.assertEqual(latency, 1)
+        self.assertAlmostEqual(latency, 1, places=5)
 
     def test_cost_estimate(self):
         cost = self.metrics.cost_estimate(1000)
