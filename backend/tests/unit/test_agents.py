@@ -1,5 +1,5 @@
 import unittest
-from agents.evaluator_agent import EvaluatorAgent
+from backend.evaluator.evaluator import EvaluatorAgent
 from unittest.mock import patch
 
 class TestEvaluatorAgent(unittest.TestCase):

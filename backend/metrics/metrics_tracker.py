@@ -7,6 +7,7 @@ from bert_score import score as bert_score_fn
 import psutil
 import time
 import math
+import torch
 
 def ensure_nltk_resource(resource_name):
     if resource_name == 'tokenizers/punkt_tab/english':
@@ -58,15 +59,32 @@ class MetricsTracker:
         return {k: v.fmeasure for k, v in scores.items()}
 
     def bert_score(self, candidates, references, model_type='bert-base-uncased'):
-        P, R, F1 = bert_score_fn(candidates, references, lang='en', model_type=model_type)
-        return float(F1.mean().item())
+        P, R, F1 = bert_score_fn(
+            candidates,
+            references,
+            lang='en',
+            model_type=model_type
+        )
+
+        if isinstance(F1, torch.Tensor):
+            return float(F1.mean().item())
+
+        return 0.0
 
     def perplexity(self, candidate, reference):
-        # Simple pseudo-perplexity
         candidate_tokens = nltk.word_tokenize(candidate)
+        if not candidate_tokens:
+            return 0.0
+
         ref_tokens = set(nltk.word_tokenize(reference))
-        prob = sum(1 for t in candidate_tokens if t in ref_tokens) / len(candidate_tokens)
-        return math.exp(-math.log(prob+1e-8))
+        overlap = sum(1 for t in candidate_tokens if t in ref_tokens)
+
+        prob = overlap / len(candidate_tokens)
+
+        # clamp to avoid explosion
+        prob = max(prob, 1e-6)
+
+        return min(math.exp(-math.log(prob)), 100.0)
 
     # Custom metrics
     def hallucination_rate(self, candidate, reference_tokens):
