@@ -7,6 +7,14 @@ class MetricsTracker:
     def __init__(self):
         self._rouge = rouge_scorer.RougeScorer(["rouge1", "rougeL"], use_stemmer=True)
 
+    def _tokenize(self, text: str):
+        """Tokenize text with NLTK, falling back when punkt resources are unavailable."""
+        try:
+            return nltk.word_tokenize(text)
+        except LookupError:
+            # Fallback keeps metrics operational even if punkt data is missing in CI.
+            return nltk.wordpunct_tokenize(text)
+
     def bert_score(self, candidate, reference, model_type='bert-base-uncased'):
         # Normalise inputs
         if isinstance(candidate, str):
@@ -50,17 +58,17 @@ class MetricsTracker:
         return len(out & ctx) / max(1, len(out))
 
     def diversity_score(self, text: str) -> float:
-        tokens = nltk.word_tokenize(text)
+        tokens = self._tokenize(text)
         if not tokens:
             return 0.0
         return len(set(tokens)) / len(tokens)
 
     def perplexity(self, candidate: str, reference: str) -> float:
-        tokens = nltk.word_tokenize(candidate)
+        tokens = self._tokenize(candidate)
         if not tokens or not reference:
             return 0.0
 
-        ref_tokens = set(nltk.word_tokenize(reference))
+        ref_tokens = set(self._tokenize(reference))
         overlap = sum(1 for t in tokens if t in ref_tokens)
 
         prob = overlap / len(tokens)

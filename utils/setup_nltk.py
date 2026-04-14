@@ -2,7 +2,8 @@
 import nltk
 
 def download_nltk_resources():
-    resources = ["punkt"]
+    # Newer NLTK tokenizers may require both punkt and punkt_tab.
+    resources = ["punkt", "punkt_tab"]
     for res in resources:
         nltk.download(res, quiet=True)
     print("✅ NLTK resources downloaded successfully!")
