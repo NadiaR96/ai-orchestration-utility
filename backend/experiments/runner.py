@@ -1,6 +1,6 @@
 from typing import List, Dict, Any
 from backend.experiments.results import ExperimentResult
-from backend.orchestrator import Orchestrator
+from backend.orchestrator.orchestrator import Orchestrator
 
 
 class ExperimentRunner:

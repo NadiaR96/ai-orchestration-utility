@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from backend.orchestrator import Orchestrator
+from backend.orchestrator.orchestrator import Orchestrator
 from backend.evaluators.comparator import Comparator
 
 router = APIRouter()

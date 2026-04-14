@@ -6,9 +6,9 @@ from backend.main import app  # Assuming main.py creates the FastAPI app
 
 class TestAPIIntegration(unittest.TestCase):
     def setUp(self):
-        self.client = TestClient(app)
+        self.client = TestClient(app, raise_server_exceptions=False)
 
-    @patch('backend.orchestrator.Orchestrator.process_task')
+    @patch('backend.api.run_task.orchestrator.process_task')
     def test_run_task_string_input(self, mock_process):
         from backend.core.types import RunResult, EvaluationResult
 
@@ -37,7 +37,7 @@ class TestAPIIntegration(unittest.TestCase):
         self.assertEqual(data["evaluation"]["score"], 0.85)
         mock_process.assert_called_once_with({"input": "Test prompt"})
 
-    @patch('backend.orchestrator.Orchestrator.process_task')
+    @patch('backend.api.run_task.orchestrator.process_task')
     def test_run_task_dict_input(self, mock_process):
         from backend.core.types import RunResult, EvaluationResult
 
@@ -67,7 +67,7 @@ class TestAPIIntegration(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         mock_process.assert_called_once_with(request_data)
 
-    @patch('backend.orchestrator.Orchestrator.process_task')
+    @patch('backend.api.run_task.orchestrator.process_task')
     def test_run_task_empty_request(self, mock_process):
         mock_result = MagicMock()
         mock_process.return_value = mock_result
@@ -78,11 +78,15 @@ class TestAPIIntegration(unittest.TestCase):
         mock_process.assert_called_once_with({})
 
     def test_run_task_invalid_json(self):
-        response = self.client.post("/run-task", data="invalid json")
+        response = self.client.post(
+            "/run-task",
+            content="invalid json",
+            headers={"Content-Type": "application/json"}
+        )
         self.assertEqual(response.status_code, 422)  # FastAPI validation error
 
-    @patch('backend.orchestrator.Orchestrator.process_task')
-    @patch('backend.evaluators.comparator.Comparator.compare')
+    @patch('backend.api.compare.orchestrator.process_task')
+    @patch('backend.api.compare.comparator.compare')
     def test_compare_basic(self, mock_compare, mock_process):
         from backend.core.types import RunResult, EvaluationResult
 
@@ -139,8 +143,8 @@ class TestAPIIntegration(unittest.TestCase):
         self.assertEqual(calls[0][0][0]["input"], "Compare this")
         self.assertEqual(calls[1][0][0]["input"], "Compare this")
 
-    @patch('backend.orchestrator.Orchestrator.process_task')
-    @patch('backend.evaluators.comparator.Comparator.compare')
+    @patch('backend.api.compare.orchestrator.process_task')
+    @patch('backend.api.compare.comparator.compare')
     def test_compare_with_reference(self, mock_compare, mock_process):
         from backend.core.types import RunResult, EvaluationResult
 
@@ -182,7 +186,7 @@ class TestAPIIntegration(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"status": "ok"})
 
-    @patch('backend.orchestrator.Orchestrator.process_task')
+    @patch('backend.api.run_task.orchestrator.process_task')
     def test_run_task_orchestrator_error(self, mock_process):
         mock_process.side_effect = Exception("Orchestrator failed")
 
@@ -190,8 +194,8 @@ class TestAPIIntegration(unittest.TestCase):
 
         self.assertEqual(response.status_code, 500)
 
-    @patch('backend.orchestrator.Orchestrator.process_task')
-    @patch('backend.evaluators.comparator.Comparator.compare')
+    @patch('backend.api.compare.orchestrator.process_task')
+    @patch('backend.api.compare.comparator.compare')
     def test_compare_orchestrator_error(self, mock_compare, mock_process):
         mock_process.side_effect = Exception("Orchestrator failed")
 

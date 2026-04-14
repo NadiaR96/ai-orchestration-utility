@@ -13,7 +13,7 @@ class TestExperimentWorkflow(unittest.TestCase):
     def setUp(self):
         self.runner = ExperimentRunner()
 
-    @patch('backend.orchestrator.Orchestrator.process_task')
+    @patch('backend.experiments.runner.Orchestrator.process_task')
     def test_run_single_experiment(self, mock_process):
         # Mock the orchestrator response
         mock_result = {
@@ -46,7 +46,7 @@ class TestExperimentWorkflow(unittest.TestCase):
             metrics=["bert_score"]
         )
 
-    @patch('backend.orchestrator.Orchestrator.process_task')
+    @patch('backend.experiments.runner.Orchestrator.process_task')
     def test_run_single_with_reference(self, mock_process):
         mock_result = {
             "output": "Response with reference",
@@ -68,7 +68,7 @@ class TestExperimentWorkflow(unittest.TestCase):
             metrics=None
         )
 
-    @patch('backend.orchestrator.Orchestrator.process_task')
+    @patch('backend.experiments.runner.Orchestrator.process_task')
     def test_run_batch_experiments(self, mock_process):
         # Mock different results for each config
         mock_results = [
@@ -101,7 +101,7 @@ class TestExperimentWorkflow(unittest.TestCase):
         self.assertEqual(results[1].output, "Response 2")
         self.assertEqual(mock_process.call_count, 2)
 
-    @patch('backend.orchestrator.Orchestrator.process_task')
+    @patch('backend.experiments.runner.Orchestrator.process_task')
     def test_compare_pair_experiments(self, mock_process):
         mock_results = [
             {
@@ -135,7 +135,7 @@ class TestExperimentWorkflow(unittest.TestCase):
         self.assertEqual(result["comparison"]["winner"], "B")
         self.assertAlmostEqual(result["comparison"]["margin"], 0.1, places=5)
 
-    @patch('backend.orchestrator.Orchestrator.process_task')
+    @patch('backend.experiments.runner.Orchestrator.process_task')
     def test_compare_pair_without_custom_compare(self, mock_process):
         mock_results = [
             {
@@ -173,7 +173,6 @@ class TestExperimentTracker(unittest.TestCase):
 
     def tearDown(self):
         # Clean up temp files and directories recursively
-        import shutil
         if os.path.exists(self.temp_dir):
             shutil.rmtree(self.temp_dir)
 
