@@ -1,19 +1,26 @@
+from backend.core.types import EvaluationResult
 from backend.metrics.metrics_tracker import MetricsTracker
-from backend.evaluators.metrics_registry import MetricRegistry
+from backend.evaluators.normaliser import Normaliser
 
 
 class Evaluator:
     def __init__(self):
-        self.tracker = MetricsTracker()
-        self.registry = MetricRegistry(self.tracker)
+        self.metrics = MetricsTracker()
+        self.normaliser = Normaliser()
 
-    def evaluate(self, candidate, reference=None, metrics=None):
-        if not reference:
-            return {"note": "No reference provided - evaluation skipped."}
+    def evaluate(self, output, reference, chunks, scorer, strategy, cost=0.0, latency=0.0):
 
-        if not metrics:
-            metrics = ["meteor", "rouge", "bert_score"]
+        raw = self.metrics.compute_all(output, reference, chunks)
 
-        return self.registry.compute(metrics, candidate, reference)
+        raw["cost"] = cost
+        raw["latency"] = latency
 
+        norm = self.normaliser.normalise(raw)
 
+        score = scorer.compute(norm)
+
+        return EvaluationResult(
+            metrics=norm,
+            score=score,
+            strategy=strategy
+        )

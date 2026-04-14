@@ -1,5 +1,5 @@
 import unittest
-from agents.hf_agent import HuggingFaceAgent
+from backend.agents.hf_agent import HuggingFaceAgent
 
 class TestHuggingFaceAgentIntegration(unittest.TestCase):
     def setUp(self):

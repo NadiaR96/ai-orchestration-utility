@@ -1,91 +1,94 @@
+import time
+
 from backend.models.registry import get_model
 from backend.agents.hf_agent import HuggingFaceAgent
 from backend.rag.retriever import Retriever
 from backend.rag.context import RAGContext
 from backend.rag.prompt_builder import PromptBuilder
 from backend.evaluators.evaluator import Evaluator
-from backend.rag.vector_store import VectorStore
-import time
+from backend.scoring.registry import get_scorer
+from backend.core.types import RunResult
 
 
 class Orchestrator:
     def __init__(self):
-        self.agent = HuggingFaceAgent(get_model("small"))
-        self.prompt_builder = PromptBuilder()
         self.evaluator = Evaluator()
-        self.vector_store = VectorStore()
+        self.prompt_builder = PromptBuilder()
 
-
-    def process_task(self, task, metrics=None, model="small", retrieval="rag"):
+    def process_task(
+        self,
+        task,
+        model="small",
+        retrieval="rag",
+        strategy="balanced"
+    ):
         # -------------------------
-        # 1. Normalise input
+        # 1. Input normalisation
         # -------------------------
+        reference = None
         if isinstance(task, dict):
             query = task.get("input", "")
             reference = task.get("reference")
+
+        if isinstance(reference, list):
+                reference = " ".join(reference)
         else:
             query = task
             reference = None
 
         # -------------------------
-        # 2. Model switch
+        # 2. Model (stateless per run)
         # -------------------------
-        self.agent.set_model(get_model(model))
+        model_instance = get_model(model)
+        agent = HuggingFaceAgent(model_instance)
 
         # -------------------------
-        # 3. Retrieval (NOW CORRECT)
+        # 3. Retrieval
         # -------------------------
-        retriever = Retriever(store=self.vector_store, mode=retrieval)
+        retriever = Retriever(mode=retrieval)
         chunks = retriever.search(query)
 
-        # -------------------------
-        # 4. Context
-        # -------------------------
-        context = RAGContext(
-            query=query,
-            chunks=chunks
-        )
+        context = RAGContext(query=query, chunks=chunks)
 
         # -------------------------
-        # 5. Prompt
+        # 4. Prompt
         # -------------------------
         prompt = self.prompt_builder.build(context)
 
         # -------------------------
-        # 6. Generation
+        # 5. Generation + latency
         # -------------------------
-        start_time = time.time()
-        output = self.agent.run(prompt)
-        latency = time.time() - start_time
-        
-        
-        #---------------------------
-        #7. Cost Estimation (mock)
-        #---------------------------
-        
-        cost = self.estimate_cost(output);
-        # -------------------------
-        # 8. Evaluation
-        # -------------------------
-        evaluation = {}
-        if metrics and reference:
-            evaluation = self.evaluator.evaluate(output, reference, metrics)
+        start = time.time()
+        output = agent.run(prompt)
+        latency = time.time() - start
 
         # -------------------------
-        # 9. Output
+        # 6. Cost (simple proxy)
         # -------------------------
-        return {
-            "output": output,
-            "evaluation": evaluation,
-            "model": model,
-            "retrieval": retrieval,
-            "latency": latency,
-            "cost": cost,
-            "context_used": len(chunks) > 0,
-            "rag_context": context.to_debug()
-        }
-        
-    def estimate_cost(self, output: str) -> float:
-        # simple proxy: tokens ~ words
-        tokens = len(output.split())
-        return tokens * 0.00001  # mock cost model
+        cost = len(output.split()) * 0.00001
+
+        # -------------------------
+        # 7. Evaluation pipeline
+        # -------------------------
+        scorer = get_scorer(strategy)
+
+        result = self.evaluator.evaluate(
+            output=output,
+            reference=reference,
+            chunks=chunks,
+            scorer=scorer,
+            strategy=strategy,
+            cost=cost,
+            latency=latency
+        )
+
+        return RunResult(
+            output=output,
+            evaluation=result,
+            model=model,
+            retrieval=retrieval,
+            latency=latency,
+            cost=cost,
+            context_used=len(chunks) > 0,
+            rag_context=context.to_debug()
+        )
