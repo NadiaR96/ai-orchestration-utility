@@ -117,11 +117,11 @@ Steps:
 - Setup Python
 - Install dependencies
 - Setup NLTK resources
-- Run unit tests only
+- Run unit and integration tests
 - Build Docker image
 - Run Docker container for verification
 
-Integration tests are excluded from CI/CD to keep pipelines fast.
+Integration tests run on `workflow_dispatch` only (they load real HuggingFace models and require secrets).
 
 ## **📈 Extending the Platform**
 

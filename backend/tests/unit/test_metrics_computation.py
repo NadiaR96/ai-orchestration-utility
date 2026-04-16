@@ -38,16 +38,16 @@ class TestMetricsComputation(unittest.TestCase):
         self.assertIn("rouge1", results["rouge"])
         self.assertIn("rougeL", results["rouge"])
 
-    @patch('backend.metrics.metrics_tracker.bert_score_fn')
+    @patch('backend.metrics.metrics_tracker.bert_score')
     def test_compute_all_without_reference(self, mock_bert):
-        # BERT should not be called
-        mock_bert.assert_not_called()
-
         output = "The cat sat on the mat."
         reference = ""
         chunks = ["The cat is an animal."]
 
         results = self.tracker.compute_all(output, reference, chunks)
+
+        # BERT should not be called when there is no reference
+        mock_bert.assert_not_called()
 
         # Check default values
         self.assertEqual(results["bert_score"], 0.0)

@@ -14,7 +14,7 @@ class Orchestrator:
         self.evaluator = Evaluator()
         self.prompt_builder = PromptBuilder()
 
-    def process_task(self, task, model="small", retrieval="rag", strategy="balanced", metrics=None):
+    def process_task(self, task, model="small", retrieval="rag", strategy="balanced"):
 
         # -------------------------
         # 1. Parse input
@@ -63,10 +63,11 @@ class Orchestrator:
         # -------------------------
         # 7. Evaluation (NO scorer registry here)
         # -------------------------
+        chunk_texts = [c.text for c in chunks]
         evaluation = self.evaluator.evaluate(
             output=output,
             reference=reference,
-            chunks=chunks,
+            chunks=chunk_texts,
             strategy=strategy,
             cost=cost,
             latency=latency

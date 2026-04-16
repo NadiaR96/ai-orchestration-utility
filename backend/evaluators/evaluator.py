@@ -30,7 +30,7 @@ class Evaluator:
             scorer = get_scorer(scorer_or_strategy)
         else:
             strategy_name = strategy
-            scorer = get_scorer(scorer_or_strategy)
+            scorer = get_scorer(strategy)
 
         score = scorer.compute(norm)
 

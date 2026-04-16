@@ -43,7 +43,6 @@ class TestExperimentWorkflow(unittest.TestCase):
             task={"input": "Test prompt", "reference": None},
             model="small",
             retrieval="rag",
-            metrics=["bert_score"]
         )
 
     @patch('backend.experiments.runner.Orchestrator.process_task')
@@ -65,7 +64,6 @@ class TestExperimentWorkflow(unittest.TestCase):
             task={"input": "Test prompt", "reference": "Expected output"},
             model="large",
             retrieval="none",
-            metrics=None
         )
 
     @patch('backend.experiments.runner.Orchestrator.process_task')

@@ -89,7 +89,6 @@ class ExperimentRunner:
             task={"input": prompt, "reference": reference},
             model=model,
             retrieval=retrieval,
-            metrics=metrics,
         )
 
         return self._to_result(result, model, retrieval)

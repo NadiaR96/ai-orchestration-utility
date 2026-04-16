@@ -10,8 +10,8 @@ class EvaluationNarrativeEngine:
         parts = []
 
         # quality
-        if r.get("evaluation", {}).get("bertscore") is not None:
-            parts.append(f"semantic quality={r['evaluation']['bertscore']:.3f}")
+        if r.get("evaluation", {}).get("bert_score") is not None:
+            parts.append(f"semantic quality={r['evaluation']['bert_score']:.3f}")
 
         if "hallucination" in r.get("evaluation", {}):
             parts.append(f"hallucination={r['evaluation']['hallucination']:.3f}")

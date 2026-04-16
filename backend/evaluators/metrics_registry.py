@@ -3,7 +3,7 @@ class MetricRegistry:
         self.tracker = tracker
 
         self.registry = {
-            "meteor": self._safe(self.tracker.meteor),
+            "meteor": self._safe(self._meteor_wrapper),
             "rouge": self._safe(self.tracker.rouge),
             "bert_score": self._safe(self.tracker.bert_score),
             "perplexity": self._safe(self.tracker.perplexity),
@@ -21,6 +21,9 @@ class MetricRegistry:
             except Exception as e:
                 return {"error": str(e)}
         return wrapper
+
+    def _meteor_wrapper(self, candidate, reference):
+        return self.tracker.meteor(candidate, reference)
 
     def _hallucination_wrapper(self, candidate, reference):
         import nltk

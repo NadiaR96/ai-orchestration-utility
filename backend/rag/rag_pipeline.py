@@ -1,3 +1,6 @@
+from backend.rag.context import RAGContext
+
+
 class RAGPipeline:
     def __init__(self, retriever, prompt_builder):
         self.retriever = retriever
@@ -5,7 +8,8 @@ class RAGPipeline:
 
     def run(self, query: str):
         chunks = self.retriever.search(query)
-        prompt = self.prompt_builder.build(query, chunks)
+        context = RAGContext(query=query, chunks=chunks)
+        prompt = self.prompt_builder.build(context)
 
         return {
             "prompt": prompt,

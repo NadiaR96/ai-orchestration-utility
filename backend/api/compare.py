@@ -37,7 +37,7 @@ def compare_v2(request: CompareRequest):
     comparison = None
 
     if len(evaluations) > 1:
-        comparison = comparator.compare_many(evaluations)
+        comparison = comparator.compare_many(evaluations, strategy=request.strategy)
 
     # -------------------------
     # 3. Return typed response

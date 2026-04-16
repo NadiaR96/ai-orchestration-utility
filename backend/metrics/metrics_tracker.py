@@ -199,7 +199,8 @@ class MetricsTracker:
         if not chunks:
             return 0.0
 
-        context = set(_tokenize(" ".join(chunks)))
+        chunk_texts = [getattr(c, "text", str(c)) for c in chunks]
+        context = set(_tokenize(" ".join(chunk_texts)))
         output_tokens = set(_tokenize(output))
 
         if not output_tokens:
@@ -215,3 +216,48 @@ class MetricsTracker:
             return 0.0
 
         return len(set(tokens)) / len(tokens)
+
+    def meteor(self, output, reference):
+        out_tokens = _tokenize(output)
+        ref_tokens = _tokenize(reference)
+
+        if not out_tokens or not ref_tokens:
+            return 0.0
+
+        out_set = set(out_tokens)
+        ref_set = set(ref_tokens)
+
+        matches = len(out_set & ref_set)
+        if matches == 0:
+            return 0.0
+
+        precision = matches / len(out_tokens)
+        recall = matches / len(ref_tokens)
+
+        # Weighted harmonic mean (alpha=0.9 as in standard METEOR)
+        alpha = 0.9
+        return precision * recall / (alpha * precision + (1 - alpha) * recall)
+
+    def f1_precision_recall(self, output, reference_tokens):
+        out_tokens = set(_tokenize(output))
+        ref_tokens = set(token.lower() for token in reference_tokens)
+
+        if not out_tokens or not ref_tokens:
+            return {"precision": 0.0, "recall": 0.0, "f1": 0.0}
+
+        overlap = len(out_tokens & ref_tokens)
+        precision = overlap / len(out_tokens)
+        recall = overlap / len(ref_tokens)
+        f1 = (2 * precision * recall / (precision + recall)) if (precision + recall) > 0 else 0.0
+
+        return {"precision": precision, "recall": recall, "f1": f1}
+
+    def coverage_score(self, output, reference_tokens):
+        out_tokens = set(_tokenize(output))
+        ref_tokens = set(token.lower() for token in reference_tokens)
+
+        if not ref_tokens:
+            return 0.0
+
+        covered = len(ref_tokens & out_tokens)
+        return covered / len(ref_tokens)
