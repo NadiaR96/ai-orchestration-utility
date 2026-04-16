@@ -1,6 +1,13 @@
 from sentence_transformers import SentenceTransformer
-import faiss
 import numpy as np
+
+try:
+    import faiss
+except ImportError as e:  # pragma: no cover
+    raise ImportError(
+        "faiss-cpu is required for vector search. "
+        "Install it with: pip install faiss-cpu"
+    ) from e
 
 
 class FAISSStore:

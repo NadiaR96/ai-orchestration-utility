@@ -4,6 +4,7 @@ pandas>=2.1.0
 transformers>=5.3.0
 datasets>=2.15.0
 sentence-transformers>=2.2.2
+faiss-cpu>=1.9.0
 bert-score>=0.3.13
 rouge-score>=0.1.2
 nltk>=3.9.0
