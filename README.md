@@ -117,7 +117,7 @@ Steps:
 - Setup Python
 - Install dependencies
 - Setup NLTK resources
-- Run unit and integration tests
+- Run unit tests
 - Build Docker image
 - Run Docker container for verification
 

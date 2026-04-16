@@ -235,8 +235,13 @@ class MetricsTracker:
         recall = matches / len(ref_tokens)
 
         # Weighted harmonic mean (alpha=0.9 as in standard METEOR)
+        # denominator is always > 0 here because matches > 0 implies both
+        # precision and recall are > 0; guard is kept for defensive clarity.
         alpha = 0.9
-        return precision * recall / (alpha * precision + (1 - alpha) * recall)
+        denominator = alpha * precision + (1 - alpha) * recall
+        if denominator == 0.0:
+            return 0.0
+        return precision * recall / denominator
 
     def f1_precision_recall(self, output, reference_tokens):
         out_tokens = set(_tokenize(output))
