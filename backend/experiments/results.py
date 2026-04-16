@@ -8,4 +8,4 @@ class ExperimentResult:
     model: str
     retrieval: str
     metrics: dict[str, Any]
-    context: dict[str, Any]
+    rag_context: dict[str, Any]

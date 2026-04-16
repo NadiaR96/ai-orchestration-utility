@@ -1,21 +1,24 @@
-from backend.core.types import EvaluationResult
+from backend.core.types import ComparisonResult
 
 
 class Comparator:
-    def compare(self, a: EvaluationResult, b: EvaluationResult):
+    def compare_many(self, evaluations: dict, strategy: str = "balanced") -> ComparisonResult:
 
-        if a.score > b.score:
-            winner = "A"
-        elif b.score > a.score:
-            winner = "B"
-        else:
-            winner = "tie"
+        scored = [
+            (model, eval_result.score)
+            for model, eval_result in evaluations.items()
+        ]
 
-        return {
-            "winner": winner,
-            "score_breakdown": {
-                "A": a.score,
-                "B": b.score
-            },
-            "strategy": a.strategy
-        }
+        scored.sort(key=lambda x: x[1], reverse=True)
+
+        ranking = [m for m, _ in scored]
+
+        return ComparisonResult(
+            winner=ranking[0],
+            ranking=ranking,
+            strategy=strategy,
+            score_breakdown={
+                model: eval_result.score
+                for model, eval_result in evaluations.items()
+            }
+        )

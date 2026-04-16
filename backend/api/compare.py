@@ -1,37 +1,50 @@
 from fastapi import APIRouter
+
+from backend.api.schemas import CompareRequest
 from backend.orchestrator.orchestrator import Orchestrator
 from backend.evaluators.comparator import Comparator
+from backend.core.types import ExecutionResponse
 
 router = APIRouter()
 
-orchestrator = Orchestrator()
-comparator = Comparator()
 
+@router.post("", response_model=ExecutionResponse)
+def compare_v2(request: CompareRequest):
 
-@router.post("")
-def compare(request: dict):
+    orchestrator = Orchestrator()
+    comparator = Comparator()
 
-    result_a = orchestrator.process_task(
-        {"input": request["input"], "reference": request.get("reference")},
-        model=request.get("model_a", "small"),
-        retrieval=request.get("retrieval", "rag"),
-        strategy=request.get("strategy", "balanced")
+    runs = {}
+    evaluations = {}
+
+    # -------------------------
+    # 1. Run models
+    # -------------------------
+    for model in request.models:
+
+        bundle = orchestrator.process_task(
+            task=request.input,
+            model=model,
+            strategy=request.strategy
+        )
+
+        runs[model] = bundle.run
+        evaluations[model] = bundle.evaluation
+
+    # -------------------------
+    # 2. Compare
+    # -------------------------
+    comparison = None
+
+    if len(evaluations) > 1:
+        comparison = comparator.compare_many(evaluations)
+
+    # -------------------------
+    # 3. Return typed response
+    # -------------------------
+    return ExecutionResponse(
+        run=None,
+        runs=runs,
+        evaluations=evaluations,
+        comparison=comparison
     )
-
-    result_b = orchestrator.process_task(
-        {"input": request["input"], "reference": request.get("reference")},
-        model=request.get("model_b", "google/flan-t5-base"),
-        retrieval=request.get("retrieval", "rag"),
-        strategy=request.get("strategy", "balanced")
-    )
-
-    comparison = comparator.compare(
-        result_a.evaluation,
-        result_b.evaluation
-    )
-
-    return {
-        "A": result_a,
-        "B": result_b,
-        "comparison": comparison
-    }

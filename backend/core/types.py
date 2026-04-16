@@ -1,11 +1,9 @@
 from dataclasses import dataclass
-from typing import Any, Dict
-
+from typing import Any, Dict, List, Optional
 
 @dataclass
 class RunResult:
     output: str
-    evaluation: Any  # EvaluationResult (avoids circular imports)
     model: str
     retrieval: str
     latency: float
@@ -18,3 +16,22 @@ class EvaluationResult:
     metrics: Dict[str, Any]
     score: float
     strategy: str
+
+@dataclass
+class RunBundle:
+    run: RunResult
+    evaluation: EvaluationResult
+    
+@dataclass
+class ComparisonResult:
+    winner: str
+    ranking: List[str]
+    score_breakdown: Dict[str, float]
+    strategy: str
+    
+@dataclass
+class ExecutionResponse:
+    run: Optional[RunResult]
+    runs: Optional[Dict[str, RunResult]]
+    evaluations: Optional[Dict[str, EvaluationResult]]
+    comparison: Optional[ComparisonResult]

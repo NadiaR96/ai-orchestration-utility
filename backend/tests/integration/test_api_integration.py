@@ -1,81 +1,60 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from fastapi.testclient import TestClient
-from backend.main import app  # Assuming main.py creates the FastAPI app
+from backend.main import app
+from backend.core.types import RunResult, EvaluationResult, RunBundle, ComparisonResult
 
 
 class TestAPIIntegration(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(app, raise_server_exceptions=False)
 
-    @patch('backend.api.run_task.orchestrator.process_task')
-    def test_run_task_string_input(self, mock_process):
-        from backend.core.types import RunResult, EvaluationResult
-
-        mock_evaluation = EvaluationResult(
-            metrics={"bert_score": 0.8},
-            score=0.85,
-            strategy="quality"
-        )
-        mock_result = RunResult(
-            output="Generated response",
-            evaluation=mock_evaluation,
-            model="small",
+    def _make_bundle(self, output="Generated response", model="small", score=0.85, strategy="balanced"):
+        run = RunResult(
+            output=output,
+            model=model,
             retrieval="rag",
             latency=1.2,
             cost=0.01,
             context_used=True,
             rag_context={}
         )
-        mock_process.return_value = mock_result
+        evaluation = EvaluationResult(
+            metrics={"bert_score": 0.8},
+            score=score,
+            strategy=strategy
+        )
+        return RunBundle(run=run, evaluation=evaluation)
+
+    @patch('backend.api.run.orchestrator.process_task')
+    def test_run_task_string_input(self, mock_process):
+        mock_process.return_value = self._make_bundle()
 
         response = self.client.post("/run-task", json={"input": "Test prompt"})
 
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertEqual(data["output"], "Generated response")
-        self.assertEqual(data["evaluation"]["score"], 0.85)
-        mock_process.assert_called_once_with({"input": "Test prompt"})
+        self.assertEqual(data["run"]["output"], "Generated response")
+        self.assertEqual(data["evaluations"]["single"]["score"], 0.85)
+        self.assertIsNone(data["comparison"])
+        mock_process.assert_called_once()
 
-    @patch('backend.api.run_task.orchestrator.process_task')
-    def test_run_task_dict_input(self, mock_process):
-        from backend.core.types import RunResult, EvaluationResult
+    @patch('backend.api.run.orchestrator.process_task')
+    def test_run_task_with_model(self, mock_process):
+        mock_process.return_value = self._make_bundle(model="large")
 
-        mock_evaluation = EvaluationResult(
-            metrics={"bert_score": 0.9},
-            score=0.9,
-            strategy="quality"
-        )
-        mock_result = RunResult(
-            output="Response with reference",
-            evaluation=mock_evaluation,
-            model="small",
-            retrieval="rag",
-            latency=1.0,
-            cost=0.02,
-            context_used=True,
-            rag_context={}
-        )
-        mock_process.return_value = mock_result
-
-        request_data = {
-            "input": "Test prompt",
-            "reference": "Expected output"
-        }
-        response = self.client.post("/run-task", json=request_data)
+        response = self.client.post("/run-task", json={"input": "Test prompt", "model": "large"})
 
         self.assertEqual(response.status_code, 200)
-        mock_process.assert_called_once_with(request_data)
+        data = response.json()
+        self.assertEqual(data["run"]["model"], "large")
+        mock_process.assert_called_once()
 
-    @patch('backend.api.run_task.orchestrator.process_task')
-    def test_run_task_empty_request(self, mock_process):
-        mock_result = MagicMock()
-        mock_process.return_value = mock_result
-
+    @patch('backend.api.run.orchestrator.process_task')
+    def test_run_task_missing_input(self, mock_process):
         response = self.client.post("/run-task", json={})
-
-        self.assertEqual(response.status_code, 200)
-        mock_process.assert_called_once_with({})
+        self.assertEqual(response.status_code, 422)
+        mock_process.assert_not_called()
 
     def test_run_task_invalid_json(self):
         response = self.client.post(
@@ -83,124 +62,85 @@ class TestAPIIntegration(unittest.TestCase):
             content="invalid json",
             headers={"Content-Type": "application/json"}
         )
-        self.assertEqual(response.status_code, 422)  # FastAPI validation error
+        self.assertEqual(response.status_code, 422)
 
-    @patch('backend.api.compare.orchestrator.process_task')
-    @patch('backend.api.compare.comparator.compare')
-    def test_compare_basic(self, mock_compare, mock_process):
-        from backend.core.types import RunResult, EvaluationResult
-
-        mock_evaluation_a = EvaluationResult(
-            metrics={"bert_score": 0.8},
-            score=0.8,
-            strategy="quality"
-        )
-        mock_result_a = RunResult(
-            output="Response A",
-            evaluation=mock_evaluation_a,
-            model="small",
-            retrieval="rag",
-            latency=1.0,
-            cost=0.01,
-            context_used=True,
-            rag_context={}
+    @patch('backend.api.compare.Comparator')
+    @patch('backend.api.compare.Orchestrator')
+    def test_compare_basic(self, mock_orch_cls, mock_comp_cls):
+        bundle_a = self._make_bundle(output="Response A", model="small", score=0.8)
+        bundle_b = self._make_bundle(output="Response B", model="large", score=0.9)
+        mock_orch_cls.return_value.process_task.side_effect = [bundle_a, bundle_b]
+        mock_comp_cls.return_value.compare_many.return_value = ComparisonResult(
+            winner="large",
+            ranking=["large", "small"],
+            score_breakdown={"small": 0.8, "large": 0.9},
+            strategy="balanced"
         )
 
-        mock_evaluation_b = EvaluationResult(
-            metrics={"bert_score": 0.7},
-            score=0.7,
-            strategy="quality"
-        )
-        mock_result_b = RunResult(
-            output="Response B",
-            evaluation=mock_evaluation_b,
-            model="small",
-            retrieval="rag",
-            latency=1.2,
-            cost=0.02,
-            context_used=True,
-            rag_context={}
-        )
-
-        mock_process.side_effect = [mock_result_a, mock_result_b]
-
-        mock_comparison = {"winner": "A", "score_breakdown": {"A": 0.8, "B": 0.7}}
-        mock_compare.return_value = mock_comparison
-
-        request_data = {"input": "Compare this"}
-        response = self.client.post("/compare", json=request_data)
+        response = self.client.post("/compare", json={"input": "Compare this", "models": ["small", "large"]})
 
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertIn("A", data)
-        self.assertIn("B", data)
-        self.assertIn("comparison", data)
-        self.assertEqual(data["comparison"]["winner"], "A")
+        self.assertIn("small", data["runs"])
+        self.assertIn("large", data["runs"])
+        self.assertEqual(data["comparison"]["winner"], "large")
 
-        # Verify orchestrator calls
-        self.assertEqual(mock_process.call_count, 2)
-        calls = mock_process.call_args_list
-        self.assertEqual(calls[0][0][0]["input"], "Compare this")
-        self.assertEqual(calls[1][0][0]["input"], "Compare this")
+    @patch('backend.api.compare.Comparator')
+    @patch('backend.api.compare.Orchestrator')
+    def test_compare_single_model(self, mock_orch_cls, mock_comp_cls):
+        bundle = self._make_bundle(output="Response A", model="small", score=0.8)
+        mock_orch_cls.return_value.process_task.return_value = bundle
 
-    @patch('backend.api.compare.orchestrator.process_task')
-    @patch('backend.api.compare.comparator.compare')
-    def test_compare_with_reference(self, mock_compare, mock_process):
-        from backend.core.types import RunResult, EvaluationResult
-
-        mock_result_a = RunResult(
-            output="Response A",
-            evaluation=EvaluationResult(metrics={}, score=0.8, strategy="quality"),
-            model="small", retrieval="rag", latency=1.0, cost=0.01, context_used=True, rag_context={}
-        )
-        mock_result_b = RunResult(
-            output="Response B",
-            evaluation=EvaluationResult(metrics={}, score=0.7, strategy="quality"),
-            model="small", retrieval="rag", latency=1.0, cost=0.01, context_used=True, rag_context={}
-        )
-        mock_process.side_effect = [mock_result_a, mock_result_b]
-
-        mock_compare.return_value = {"winner": "B"}
-
-        request_data = {
-            "input": "Test input",
-            "reference": "Expected reference"
-        }
-        response = self.client.post("/compare", json=request_data)
+        response = self.client.post("/compare", json={"input": "Test input"})
 
         self.assertEqual(response.status_code, 200)
+        data = response.json()
+        mock_comp_cls.return_value.compare_many.assert_not_called()
+        self.assertIsNone(data["comparison"])
 
-        # Verify reference is passed to both calls
-        calls = mock_process.call_args_list
-        for call in calls:
-            self.assertEqual(call[0][0]["input"], "Test input")
-            self.assertEqual(call[0][0]["reference"], "Expected reference")
+    @patch('backend.api.compare.Comparator')
+    @patch('backend.api.compare.Orchestrator')
+    def test_compare_with_strategy(self, mock_orch_cls, mock_comp_cls):
+        bundle_a = self._make_bundle(model="small", score=0.7, strategy="cost_aware")
+        bundle_b = self._make_bundle(model="large", score=0.9, strategy="cost_aware")
+        mock_orch_cls.return_value.process_task.side_effect = [bundle_a, bundle_b]
+        mock_comp_cls.return_value.compare_many.return_value = ComparisonResult(
+            winner="large",
+            ranking=["large", "small"],
+            score_breakdown={"small": 0.7, "large": 0.9},
+            strategy="cost_aware"
+        )
+
+        response = self.client.post(
+            "/compare",
+            json={"input": "Test input", "models": ["small", "large"], "strategy": "cost_aware"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["comparison"]["strategy"], "cost_aware")
 
     def test_compare_missing_input(self):
         response = self.client.post("/compare", json={})
-        # Should fail due to missing input
-        self.assertEqual(response.status_code, 500)  # Internal server error from orchestrator
+        self.assertEqual(response.status_code, 422)
 
     def test_health_endpoint(self):
         response = self.client.get("/health")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"status": "ok"})
 
-    @patch('backend.api.run_task.orchestrator.process_task')
+    @patch('backend.api.run.orchestrator.process_task')
     def test_run_task_orchestrator_error(self, mock_process):
         mock_process.side_effect = Exception("Orchestrator failed")
 
         response = self.client.post("/run-task", json={"input": "test"})
-
         self.assertEqual(response.status_code, 500)
 
-    @patch('backend.api.compare.orchestrator.process_task')
-    @patch('backend.api.compare.comparator.compare')
-    def test_compare_orchestrator_error(self, mock_compare, mock_process):
-        mock_process.side_effect = Exception("Orchestrator failed")
+    @patch('backend.api.compare.Orchestrator')
+    def test_compare_orchestrator_error(self, mock_orch_cls):
+        mock_orch_cls.return_value.process_task.side_effect = Exception("Orchestrator failed")
 
         response = self.client.post("/compare", json={"input": "test"})
-
         self.assertEqual(response.status_code, 500)
 
 

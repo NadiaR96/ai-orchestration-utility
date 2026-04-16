@@ -13,15 +13,23 @@ class HuggingFaceAgent(BaseAgent):
             "text-generation",
             model=model_name
         )
+        self.generation_config = self.generator.model.generation_config
+        self.generation_config.max_new_tokens = 80
+        self.generation_config.do_sample = True
+        self.generation_config.temperature = 0.7
+        self.generation_config.top_p = 0.9
+        self.generation_config.repetition_penalty = 1.2
+        self.generation_config.max_length = None
+
+        tokenizer = getattr(self.generator, "tokenizer", None)
+        if tokenizer is not None and tokenizer.eos_token_id is not None:
+            self.generation_config.pad_token_id = tokenizer.eos_token_id
 
     def run(self, prompt: str) -> str:
         result = self.generator(
             prompt,
-            max_new_tokens=80,
-            do_sample=True,
-            temperature=0.7,
-            top_p=0.9,
-            repetition_penalty=1.2
+            generation_config=self.generation_config,
+            return_full_text=True
         )
 
         generated_text = result[0]["generated_text"]

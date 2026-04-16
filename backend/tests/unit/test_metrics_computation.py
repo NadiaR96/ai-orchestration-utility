@@ -7,7 +7,7 @@ class TestMetricsComputation(unittest.TestCase):
     def setUp(self):
         self.tracker = MetricsTracker()
 
-    @patch('backend.metrics.metrics_tracker.bert_score_fn')
+    @patch('backend.metrics.metrics_tracker.bert_score')
     def test_compute_all_with_reference(self, mock_bert):
         # Mock BERT score to return tensor-like object
         mock_f1 = MagicMock()

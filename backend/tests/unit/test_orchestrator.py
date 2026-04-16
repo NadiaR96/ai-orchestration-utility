@@ -9,7 +9,7 @@ class TestOrchestrator(unittest.TestCase):
         retriever_patcher = patch("backend.orchestrator.orchestrator.Retriever")
         mock_retriever_class = retriever_patcher.start()
         self.addCleanup(retriever_patcher.stop)
-
+        
         mock_retriever = MagicMock()
         mock_retriever.search.return_value = []
         # Ensure the mock returns the instance when called.
@@ -34,7 +34,7 @@ class TestOrchestrator(unittest.TestCase):
     def test_process_task_without_reference(self):
         result = self.orch.process_task("What is RAG?")
 
-        self.assertIsNotNone(result.output)
+        self.assertIsNotNone(result.run.output)
         self.assertIsNotNone(result.evaluation)
 
         # Should still produce metrics.
@@ -49,7 +49,7 @@ class TestOrchestrator(unittest.TestCase):
             "reference": "RAG stands for Retrieval Augmented Generation"
         })
 
-        self.assertIsNotNone(result.output)
+        self.assertIsNotNone(result.run.output)
         self.assertIsNotNone(result.evaluation)
 
         # Now metrics should be meaningful.

@@ -6,8 +6,7 @@ from backend.rag.retriever import Retriever
 from backend.rag.context import RAGContext
 from backend.rag.prompt_builder import PromptBuilder
 from backend.evaluators.evaluator import Evaluator
-from backend.scoring.registry import get_scorer
-from backend.core.types import RunResult
+from backend.core.types import RunResult,RunBundle
 
 
 class Orchestrator:
@@ -15,29 +14,23 @@ class Orchestrator:
         self.evaluator = Evaluator()
         self.prompt_builder = PromptBuilder()
 
-    def process_task(
-        self,
-        task,
-        model="small",
-        retrieval="rag",
-        strategy="balanced"
-    ):
+    def process_task(self, task, model="small", retrieval="rag", strategy="balanced", metrics=None):
+
         # -------------------------
-        # 1. Input normalisation
+        # 1. Parse input
         # -------------------------
-        reference = None
         if isinstance(task, dict):
             query = task.get("input", "")
             reference = task.get("reference")
-
-        if isinstance(reference, list):
-                reference = " ".join(reference)
         else:
             query = task
             reference = None
 
+        if isinstance(reference, list):
+            reference = " ".join(reference)
+
         # -------------------------
-        # 2. Model (stateless per run)
+        # 2. Model
         # -------------------------
         model_instance = get_model(model)
         agent = HuggingFaceAgent(model_instance)
@@ -56,35 +49,34 @@ class Orchestrator:
         prompt = self.prompt_builder.build(context)
 
         # -------------------------
-        # 5. Generation + latency
+        # 5. Generation
         # -------------------------
         start = time.time()
         output = agent.run(prompt)
         latency = time.time() - start
 
         # -------------------------
-        # 6. Cost (simple proxy)
+        # 6. Cost
         # -------------------------
         cost = len(output.split()) * 0.00001
 
         # -------------------------
-        # 7. Evaluation pipeline
+        # 7. Evaluation (NO scorer registry here)
         # -------------------------
-        scorer = get_scorer(strategy)
-
-        result = self.evaluator.evaluate(
+        evaluation = self.evaluator.evaluate(
             output=output,
             reference=reference,
             chunks=chunks,
-            scorer=scorer,
             strategy=strategy,
             cost=cost,
             latency=latency
         )
 
-        return RunResult(
+        # -------------------------
+        # 8. Return PURE RunResult (no evaluation inside)
+        # -------------------------
+        run = RunResult(
             output=output,
-            evaluation=result,
             model=model,
             retrieval=retrieval,
             latency=latency,
@@ -92,3 +84,5 @@ class Orchestrator:
             context_used=len(chunks) > 0,
             rag_context=context.to_debug()
         )
+
+        return RunBundle(run=run, evaluation=evaluation)
