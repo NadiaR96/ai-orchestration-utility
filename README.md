@@ -187,7 +187,9 @@ Use the examples in [`examples/`](examples/) for ready-made requests:
 | `POST` | `/run-task` | Execute one model run and return run + evaluation | [`examples/payloads/run-task.json`](examples/payloads/run-task.json) |
 | `POST` | `/compare` | Run multiple models and return side-by-side comparison | [`examples/payloads/compare.json`](examples/payloads/compare.json) |
 | `POST` | `/leaderboard` | Prompt-based leaderboard across all scoring systems | [`examples/payloads/leaderboard-prompt.json`](examples/payloads/leaderboard-prompt.json) |
-| `GET` | `/leaderboard` | Historical leaderboard (latest run per model) with pagination | [`examples/requests.http`](examples/requests.http) |
+| `GET` | `/leaderboard` | Backward-compatible historical leaderboard alias | [`examples/requests.http`](examples/requests.http) |
+| `GET` | `/leaderboard/experiments` | Experiment-backed leaderboard (latest run per model) | [`examples/requests.http`](examples/requests.http) |
+| `GET` | `/leaderboard/live` | Live monitoring leaderboard (window + min samples) | [`examples/requests.http`](examples/requests.http) |
 
 ## **📊 Leaderboard API**
 
@@ -222,6 +224,24 @@ Optional model filter:
 
 Historical mode uses the latest logged run per model (Option A) and supports load-more via `page`, `page_size`, `has_more`, and `next_page`.
 `aggregation=latest` is currently the only supported aggregation mode (mean aggregation is planned for a future version).
+
+### **Dedicated Experiment Leaderboard**
+
+`GET /leaderboard/experiments?page=1&page_size=10&sort_strategy=balanced&aggregation=latest`
+
+This endpoint is intended for reproducible benchmark-style rankings sourced from experiment logs.
+
+### **Live Degradation Leaderboard**
+
+`GET /leaderboard/live?page=1&page_size=10&sort_strategy=balanced&window_hours=24&min_samples=1`
+
+This endpoint is intended for operational monitoring using recent live calls.
+Each leaderboard item includes trend metadata comparing the current window to the previous window:
+
+- `direction`: `up`, `down`, `stable`, `new`, or `insufficient_history`
+- `delta_score`: change in average score between windows
+- `current_avg_score`, `previous_avg_score`
+- `current_samples`, `previous_samples`
 
 ## **🛠️ CI/CD Workflow**
 

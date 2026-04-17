@@ -252,6 +252,80 @@ class TestAPIIntegration(unittest.TestCase):
         self.assertEqual(data["total_items"], 2)
         mock_load.assert_called_once()
 
+    @patch('backend.api.leaderboard._load_latest_entries_from_logs')
+    def test_leaderboard_experiments_mode_basic(self, mock_load):
+        from backend.core.types import LeaderboardEntry
+
+        run = RunResult(
+            output="Experiment output",
+            model="quality",
+            retrieval="historical",
+            latency=1.1,
+            cost=0.02,
+            context_used=False,
+            rag_context={},
+        )
+        evaluation = EvaluationResult(metrics={"bert_score": 0.88}, score=0.88, strategy="balanced")
+
+        mock_load.return_value = [
+            LeaderboardEntry(
+                model="quality",
+                run=run,
+                evaluation=evaluation,
+                scores_by_strategy={"balanced": 0.88, "quality": 0.88, "cost_aware": 0.88, "rag": 0.88},
+                ranks_by_strategy={},
+                narrative="",
+            )
+        ]
+
+        response = self.client.get("/leaderboard/experiments?page=1&page_size=10&sort_strategy=balanced")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["mode"], "experiments")
+        self.assertEqual(data["total_items"], 1)
+        self.assertEqual(data["items"][0]["model"], "quality")
+
+    @patch('backend.api.leaderboard._load_latest_entries_from_logs')
+    def test_leaderboard_live_mode_basic(self, mock_load):
+        from backend.core.types import LeaderboardEntry
+
+        run = RunResult(
+            output="Live output",
+            model="small",
+            retrieval="rag",
+            latency=0.9,
+            cost=0.01,
+            context_used=True,
+            rag_context={},
+        )
+        evaluation = EvaluationResult(metrics={"bert_score": 0.8}, score=0.8, strategy="balanced")
+
+        mock_load.return_value = [
+            LeaderboardEntry(
+                model="small",
+                run=run,
+                evaluation=evaluation,
+                scores_by_strategy={"balanced": 0.8, "quality": 0.8, "cost_aware": 0.8, "rag": 0.8},
+                ranks_by_strategy={},
+                narrative="",
+            )
+        ]
+
+        response = self.client.get("/leaderboard/live?page=1&page_size=10&sort_strategy=balanced&window_hours=24&min_samples=1")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["mode"], "live")
+        self.assertEqual(data["total_items"], 1)
+        self.assertEqual(data["items"][0]["model"], "small")
+        self.assertIn("trend", data["items"][0])
+        self.assertIn("direction", data["items"][0]["trend"])
+
+    def test_leaderboard_live_invalid_window(self):
+        response = self.client.get("/leaderboard/live?page=1&page_size=10&window_hours=0")
+        self.assertEqual(response.status_code, 422)
+
     def test_leaderboard_invalid_page(self):
         response = self.client.get("/leaderboard?page=0&page_size=10")
         self.assertEqual(response.status_code, 422)

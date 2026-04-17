@@ -4,8 +4,10 @@ from backend.api.schemas import CompareRequest
 from backend.orchestrator.orchestrator import Orchestrator
 from backend.evaluators.comparator import Comparator
 from backend.core.types import ExecutionResponse
+from backend.experiments.tracker import ExperimentTracker
 
 router = APIRouter()
+tracker = ExperimentTracker()
 
 
 @router.post("", response_model=ExecutionResponse)
@@ -26,6 +28,23 @@ def compare_v2(request: CompareRequest):
             task=request.input,
             model=model,
             strategy=request.strategy
+        )
+
+        tracker.log(
+            {
+                "source": "live",
+                "input": request.input,
+                "model": bundle.run.model,
+                "output": bundle.run.output,
+                "score": bundle.evaluation.score,
+                "strategy": bundle.evaluation.strategy,
+                "latency": bundle.run.latency,
+                "cost": bundle.run.cost,
+                "retrieval": bundle.run.retrieval,
+                "context_used": bundle.run.context_used,
+                "rag_context": bundle.run.rag_context,
+                "metrics": bundle.evaluation.metrics,
+            }
         )
 
         runs[model] = bundle.run

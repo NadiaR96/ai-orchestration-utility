@@ -42,6 +42,7 @@ class ExperimentRunner:
                 # -------------------------
                 self.tracker.log(
                     {
+                        "source": "experiment",
                         "input": input_text,
                         "model": model,
                         "output": bundle.run.output,

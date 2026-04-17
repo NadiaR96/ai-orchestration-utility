@@ -45,6 +45,7 @@ class LeaderboardEntry:
     scores_by_strategy: Dict[str, float]
     ranks_by_strategy: Dict[str, int]
     narrative: str
+    trend: Optional[Dict[str, Any]] = None
 
 
 @dataclass

@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Set
 
@@ -20,15 +21,27 @@ router = APIRouter()
 orchestrator = Orchestrator()
 comparator = Comparator()
 LOG_PATH = Path("experiments/logs.jsonl")
+SOURCE_EXPERIMENT = "experiment"
+SOURCE_LIVE = "live"
 
 
 def _build_narrative(entry: LeaderboardEntry, sort_strategy: str) -> str:
     score = entry.scores_by_strategy.get(sort_strategy, 0.0)
     rank = entry.ranks_by_strategy.get(sort_strategy, 0)
-    return (
+    message = (
         f"{entry.model}: rank #{rank} on {sort_strategy} "
         f"(score={score:.3f}, latency={entry.run.latency:.3f}s, cost={entry.run.cost:.6f})"
     )
+
+    if entry.trend:
+        direction = entry.trend.get("direction", "unknown")
+        delta = entry.trend.get("delta_score")
+        if isinstance(delta, (float, int)):
+            message += f" | trend={direction} ({float(delta):+.3f})"
+        else:
+            message += f" | trend={direction}"
+
+    return message
 
 
 def _seed_metrics(run: RunResult, evaluation: EvaluationResult) -> Dict[str, float]:
@@ -133,6 +146,7 @@ def _build_entries_from_runs(runs: Dict[str, RunResult], evaluations: Dict[str, 
                 scores_by_strategy=scores_by_strategy,
                 ranks_by_strategy={},
                 narrative="",
+                trend=None,
             )
         )
 
@@ -147,11 +161,30 @@ def _parse_models_filter(models: Optional[str]) -> Optional[Set[str]]:
     return parsed or None
 
 
-def _load_latest_entries_from_logs(models_filter: Optional[Set[str]] = None) -> List[LeaderboardEntry]:
+def _parse_timestamp(value: Optional[str]) -> Optional[datetime]:
+    if not value:
+        return None
+
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00").replace("+00:00", ""))
+    except ValueError:
+        return None
+
+
+def _load_latest_entries_from_logs(
+    models_filter: Optional[Set[str]] = None,
+    source_filter: Optional[str] = None,
+    window_hours: Optional[int] = None,
+    min_samples: int = 1,
+) -> List[LeaderboardEntry]:
     if not LOG_PATH.exists():
         return []
 
     latest_by_model: Dict[str, dict] = {}
+    counts_by_model: Dict[str, int] = {}
+    min_timestamp = None
+    if window_hours is not None:
+        min_timestamp = datetime.utcnow() - timedelta(hours=window_hours)
 
     with open(LOG_PATH, "r", encoding="utf-8") as f:
         for line in f:
@@ -163,8 +196,20 @@ def _load_latest_entries_from_logs(models_filter: Optional[Set[str]] = None) -> 
             model = record.get("model")
             if not model:
                 continue
+
+            source = str(record.get("source", SOURCE_EXPERIMENT)).lower()
+            if source_filter and source != source_filter:
+                continue
+
             if models_filter and model not in models_filter:
                 continue
+
+            if min_timestamp is not None:
+                ts = _parse_timestamp(record.get("timestamp"))
+                if ts is None or ts < min_timestamp:
+                    continue
+
+            counts_by_model[model] = counts_by_model.get(model, 0) + 1
 
             timestamp = str(record.get("timestamp", ""))
             existing = latest_by_model.get(model)
@@ -175,6 +220,9 @@ def _load_latest_entries_from_logs(models_filter: Optional[Set[str]] = None) -> 
     evaluations: Dict[str, EvaluationResult] = {}
 
     for model, record in latest_by_model.items():
+        if counts_by_model.get(model, 0) < min_samples:
+            continue
+
         run = RunResult(
             output=str(record.get("output", "")),
             model=model,
@@ -199,6 +247,115 @@ def _load_latest_entries_from_logs(models_filter: Optional[Set[str]] = None) -> 
         evaluations[model] = evaluation
 
     return _build_entries_from_runs(runs, evaluations)
+
+
+def _collect_model_score_summary(
+    source_filter: str,
+    start_time: datetime,
+    end_time: datetime,
+    models_filter: Optional[Set[str]] = None,
+) -> Dict[str, Dict[str, float]]:
+    if not LOG_PATH.exists():
+        return {}
+
+    scores_by_model: Dict[str, List[float]] = {}
+
+    with open(LOG_PATH, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+
+            record = json.loads(line)
+            model = record.get("model")
+            if not model:
+                continue
+
+            source = str(record.get("source", SOURCE_EXPERIMENT)).lower()
+            if source != source_filter:
+                continue
+
+            if models_filter and model not in models_filter:
+                continue
+
+            timestamp = _parse_timestamp(record.get("timestamp"))
+            if timestamp is None or timestamp < start_time or timestamp >= end_time:
+                continue
+
+            score = record.get("score")
+            if not isinstance(score, (int, float)):
+                continue
+
+            scores_by_model.setdefault(model, []).append(float(score))
+
+    summary: Dict[str, Dict[str, float]] = {}
+    for model, scores in scores_by_model.items():
+        if not scores:
+            continue
+        summary[model] = {
+            "count": float(len(scores)),
+            "avg_score": float(sum(scores) / len(scores)),
+        }
+
+    return summary
+
+
+def _attach_live_trends(
+    entries: List[LeaderboardEntry],
+    window_hours: int,
+    models_filter: Optional[Set[str]] = None,
+) -> None:
+    now = datetime.utcnow()
+    current_start = now - timedelta(hours=window_hours)
+    previous_start = now - timedelta(hours=window_hours * 2)
+
+    current_summary = _collect_model_score_summary(
+        source_filter=SOURCE_LIVE,
+        start_time=current_start,
+        end_time=now,
+        models_filter=models_filter,
+    )
+    previous_summary = _collect_model_score_summary(
+        source_filter=SOURCE_LIVE,
+        start_time=previous_start,
+        end_time=current_start,
+        models_filter=models_filter,
+    )
+
+    threshold = 0.01
+
+    for entry in entries:
+        current = current_summary.get(entry.model, {})
+        previous = previous_summary.get(entry.model, {})
+
+        current_count = int(current.get("count", 0.0))
+        previous_count = int(previous.get("count", 0.0))
+        current_avg = current.get("avg_score")
+        previous_avg = previous.get("avg_score")
+
+        direction = "insufficient_history"
+        delta_score = None
+
+        if current_count > 0 and previous_count == 0:
+            direction = "new"
+        elif current_count > 0 and previous_count > 0 and current_avg is not None and previous_avg is not None:
+            delta_score = float(current_avg - previous_avg)
+            if delta_score > threshold:
+                direction = "up"
+            elif delta_score < -threshold:
+                direction = "down"
+            else:
+                direction = "stable"
+
+        entry.trend = {
+            "direction": direction,
+            "delta_score": delta_score,
+            "current_avg_score": current_avg,
+            "previous_avg_score": previous_avg,
+            "current_samples": current_count,
+            "previous_samples": previous_count,
+            "window_hours": window_hours,
+        }
 
 
 @router.post("", response_model=LeaderboardResponse)
@@ -248,7 +405,67 @@ def leaderboard_history(
         models=list(_parse_models_filter(models) or []),
     )
 
-    entries = _load_latest_entries_from_logs(_parse_models_filter(models))
+    entries = _load_latest_entries_from_logs(
+        models_filter=_parse_models_filter(models),
+        source_filter=SOURCE_EXPERIMENT,
+        min_samples=1,
+    )
     response = _rank_and_paginate(entries, query.sort_strategy.lower(), query.page, query.page_size)
     response.mode = "historical"
+    return response
+
+
+@router.get("/experiments", response_model=LeaderboardResponse)
+def leaderboard_experiments(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=10, ge=1, le=100),
+    sort_strategy: str = Query(default="balanced"),
+    aggregation: str = Query(default="latest"),
+    models: Optional[str] = Query(default=None),
+):
+    if aggregation != "latest":
+        raise HTTPException(status_code=422, detail="Only aggregation=latest is supported")
+
+    query = LeaderboardHistoryQuery(
+        page=page,
+        page_size=page_size,
+        sort_strategy=sort_strategy,
+        aggregation=aggregation,
+        models=list(_parse_models_filter(models) or []),
+    )
+
+    entries = _load_latest_entries_from_logs(
+        models_filter=_parse_models_filter(models),
+        source_filter=SOURCE_EXPERIMENT,
+        min_samples=1,
+    )
+    response = _rank_and_paginate(entries, query.sort_strategy.lower(), query.page, query.page_size)
+    response.mode = "experiments"
+    return response
+
+
+@router.get("/live", response_model=LeaderboardResponse)
+def leaderboard_live(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=10, ge=1, le=100),
+    sort_strategy: str = Query(default="balanced"),
+    window_hours: int = Query(default=24, ge=1, le=168),
+    min_samples: int = Query(default=1, ge=1, le=1000),
+    models: Optional[str] = Query(default=None),
+):
+    entries = _load_latest_entries_from_logs(
+        models_filter=_parse_models_filter(models),
+        source_filter=SOURCE_LIVE,
+        window_hours=window_hours,
+        min_samples=min_samples,
+    )
+
+    _attach_live_trends(
+        entries=entries,
+        window_hours=window_hours,
+        models_filter=_parse_models_filter(models),
+    )
+
+    response = _rank_and_paginate(entries, sort_strategy.lower(), page, page_size)
+    response.mode = "live"
     return response
