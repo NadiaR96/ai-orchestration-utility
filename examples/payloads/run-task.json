@@ -1,0 +1,5 @@
+{
+  "input": "Explain retrieval augmented generation in two sentences.",
+  "model": "small",
+  "strategy": "balanced"
+}

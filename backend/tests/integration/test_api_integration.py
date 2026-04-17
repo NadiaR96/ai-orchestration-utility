@@ -143,6 +143,123 @@ class TestAPIIntegration(unittest.TestCase):
         response = self.client.post("/compare", json={"input": "test"})
         self.assertEqual(response.status_code, 500)
 
+    @patch('backend.api.leaderboard.orchestrator.process_task')
+    def test_leaderboard_prompt_mode_basic(self, mock_process):
+        mock_process.side_effect = [
+            self._make_bundle(output="Small", model="small", score=0.75, strategy="balanced"),
+            self._make_bundle(output="Large", model="large", score=0.92, strategy="balanced"),
+        ]
+
+        response = self.client.post(
+            "/leaderboard",
+            json={
+                "input": "Rank these",
+                "models": ["small", "large"],
+                "sort_strategy": "balanced",
+                "page": 1,
+                "page_size": 10,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["mode"], "prompt")
+        self.assertEqual(data["total_items"], 2)
+        self.assertFalse(data["has_more"])
+        self.assertEqual(data["items"][0]["model"], "large")
+        self.assertIn("balanced", data["strategy_rankings"])
+        self.assertIn("quality", data["strategy_rankings"])
+        self.assertEqual(mock_process.call_count, 2)
+
+    @patch('backend.api.leaderboard.orchestrator.process_task')
+    def test_leaderboard_prompt_mode_pagination(self, mock_process):
+        mock_process.side_effect = [
+            self._make_bundle(output="Small", model="small", score=0.7, strategy="balanced"),
+            self._make_bundle(output="Medium", model="medium", score=0.8, strategy="balanced"),
+            self._make_bundle(output="Large", model="large", score=0.9, strategy="balanced"),
+        ]
+
+        response = self.client.post(
+            "/leaderboard",
+            json={
+                "input": "Paginate",
+                "models": ["small", "medium", "large"],
+                "sort_strategy": "balanced",
+                "page": 2,
+                "page_size": 1,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["page"], 2)
+        self.assertEqual(data["page_size"], 1)
+        self.assertEqual(data["total_items"], 3)
+        self.assertTrue(data["has_more"])
+        self.assertEqual(data["next_page"], 3)
+        self.assertEqual(len(data["items"]), 1)
+
+    @patch('backend.api.leaderboard._load_latest_entries_from_logs')
+    def test_leaderboard_historical_mode_basic(self, mock_load):
+        run_small = RunResult(
+            output="Small",
+            model="small",
+            retrieval="historical",
+            latency=1.2,
+            cost=0.01,
+            context_used=False,
+            rag_context={},
+        )
+        run_large = RunResult(
+            output="Large",
+            model="large",
+            retrieval="historical",
+            latency=1.0,
+            cost=0.02,
+            context_used=False,
+            rag_context={},
+        )
+        eval_small = EvaluationResult(metrics={"bert_score": 0.6}, score=0.6, strategy="balanced")
+        eval_large = EvaluationResult(metrics={"bert_score": 0.9}, score=0.9, strategy="balanced")
+
+        from backend.core.types import LeaderboardEntry
+
+        mock_load.return_value = [
+            LeaderboardEntry(
+                model="small",
+                run=run_small,
+                evaluation=eval_small,
+                scores_by_strategy={"balanced": 0.6, "quality": 0.6, "cost_aware": 0.6, "rag": 0.6},
+                ranks_by_strategy={},
+                narrative="",
+            ),
+            LeaderboardEntry(
+                model="large",
+                run=run_large,
+                evaluation=eval_large,
+                scores_by_strategy={"balanced": 0.9, "quality": 0.9, "cost_aware": 0.9, "rag": 0.9},
+                ranks_by_strategy={},
+                narrative="",
+            ),
+        ]
+
+        response = self.client.get("/leaderboard?page=1&page_size=10&sort_strategy=balanced")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["mode"], "historical")
+        self.assertEqual(data["items"][0]["model"], "large")
+        self.assertEqual(data["total_items"], 2)
+        mock_load.assert_called_once()
+
+    def test_leaderboard_invalid_page(self):
+        response = self.client.get("/leaderboard?page=0&page_size=10")
+        self.assertEqual(response.status_code, 422)
+
+    def test_leaderboard_invalid_aggregation(self):
+        response = self.client.get("/leaderboard?page=1&page_size=10&aggregation=mean")
+        self.assertEqual(response.status_code, 422)
+
 
 if __name__ == '__main__':
     unittest.main()

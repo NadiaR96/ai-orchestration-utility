@@ -1,0 +1,10 @@
+{
+  "input": "Describe how model ranking can help select production LLMs.",
+  "reference": "Model ranking compares quality, latency, and cost tradeoffs.",
+  "models": ["small", "default", "quality"],
+  "retrieval": "rag",
+  "sort_strategy": "balanced",
+  "aggregation": "latest",
+  "page": 1,
+  "page_size": 10
+}

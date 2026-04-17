@@ -1,0 +1,5 @@
+{
+  "input": "Summarize the benefits of using RAG systems.",
+  "models": ["small", "quality"],
+  "strategy": "balanced"
+}

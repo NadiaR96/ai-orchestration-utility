@@ -35,3 +35,26 @@ class ExecutionResponse:
     runs: Optional[Dict[str, RunResult]]
     evaluations: Optional[Dict[str, EvaluationResult]]
     comparison: Optional[ComparisonResult]
+
+
+@dataclass
+class LeaderboardEntry:
+    model: str
+    run: RunResult
+    evaluation: EvaluationResult
+    scores_by_strategy: Dict[str, float]
+    ranks_by_strategy: Dict[str, int]
+    narrative: str
+
+
+@dataclass
+class LeaderboardResponse:
+    mode: str
+    sort_strategy: str
+    page: int
+    page_size: int
+    total_items: int
+    has_more: bool
+    next_page: Optional[int]
+    items: List[LeaderboardEntry]
+    strategy_rankings: Dict[str, ComparisonResult]

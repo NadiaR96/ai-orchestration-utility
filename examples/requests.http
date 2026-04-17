@@ -1,0 +1,28 @@
+@baseUrl = http://localhost:8000
+
+### Health Check
+GET {{baseUrl}}/health
+
+### Run Task
+POST {{baseUrl}}/run-task
+Content-Type: application/json
+
+< ./payloads/run-task.json
+
+### Compare Models
+POST {{baseUrl}}/compare
+Content-Type: application/json
+
+< ./payloads/compare.json
+
+### Leaderboard Prompt Mode
+POST {{baseUrl}}/leaderboard
+Content-Type: application/json
+
+< ./payloads/leaderboard-prompt.json
+
+### Leaderboard Historical Mode
+GET {{baseUrl}}/leaderboard?page=1&page_size=10&sort_strategy=balanced&aggregation=latest
+
+### Leaderboard Historical Mode (Filtered Models)
+GET {{baseUrl}}/leaderboard?page=1&page_size=10&sort_strategy=balanced&aggregation=latest&models=small,quality
