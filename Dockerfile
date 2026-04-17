@@ -14,5 +14,5 @@ RUN python ./utils/setup_nltk.py
 # 3️⃣ Copy repo files
 COPY . .
 
-# 4️⃣ Default command: run all unit tests (excludes integration)
-CMD ["python", "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py"]
+# 4️⃣ Default command: run unit tests (excludes integration)
+CMD ["python", "-m", "unittest", "discover", "-s", "backend/tests/unit", "-p", "test_*.py"]

@@ -38,27 +38,33 @@ Designed for **production-ready experimentation with LLMs**, evaluation of outpu
 
 ## **📂 Repository Structure**
 
-
+```text
 ai-orchestration-utility/
-├─ orchestrator.py
-├─ metrics/
-│ └─ metrics_tracker.py
-├─ agents/
-│ └─ ...
-├─ tests/
-│ ├─ test_agents.py
-│ ├─ test_metrics.py
-│ ├─ test_orchestrator.py
-│ └─ test_agents_integration.py
+├─ backend/
+│  ├─ agents/
+│  ├─ api/
+│  ├─ core/
+│  ├─ evaluators/
+│  ├─ experiments/
+│  ├─ metrics/
+│  ├─ models/
+│  ├─ orchestrator/
+│  ├─ rag/
+│  ├─ scoring/
+│  └─ tests/
+│     ├─ unit/
+│     └─ integration/
+├─ frontend/
 ├─ utils/
-│ └─ setup_nltk.py
+│  └─ setup_nltk.py
 ├─ requirements.txt
 ├─ Dockerfile
 └─ README.md
+```
 
-
-- `utils/setup_nltk.py` → Ensures NLTK data (e.g., `punkt`) is available locally or in Docker.  
-- `tests/` → Unit tests run in CI/CD; integration tests are optional.  
+- `backend/tests/unit/` → Unit tests used in CI/CD.
+- `backend/tests/integration/` → Integration tests for local validation.
+- `utils/setup_nltk.py` → Ensures NLTK data (e.g., `punkt`) is available locally or in Docker.
 
 ---
 
@@ -69,41 +75,83 @@ ai-orchestration-utility/
 ```bash
 git clone https://github.com/NadiaR96/ai-orchestration-utility.git
 cd ai-orchestration-utility
-2️⃣ Install Python dependencies
+```
+
+### **2️⃣ Install Python dependencies**
+
+```bash
 pip install -r requirements.txt
-3️⃣ Setup NLTK data
+```
+
+### **3️⃣ Setup NLTK data**
+
+```bash
 python utils/setup_nltk.py
-4️⃣ Run unit tests
-python -m unittest discover -s tests -p "test_*.py"
-5️⃣ Optional: Run in Docker
+```
+
+### **4️⃣ Run unit tests**
+
+```bash
+python -m unittest discover -s backend/tests/unit -p "test_*.py"
+```
+
+### **5️⃣ Optional: Run full test suite**
+
+```bash
+python -m unittest discover -s backend/tests -p "test_*.py"
+```
+
+### **6️⃣ Optional: Run in Docker**
+
+```bash
 docker build -t ai-orchestration-utility:latest .
 docker run --rm ai-orchestration-utility:latest
-6️⃣ Run integration tests locally (optional)
-python -m unittest discover -s tests -p "test_agents_integration.py"
-🛠️ CI/CD Workflow
-Runs on push or pull request to main branch
+```
+
+## **🛠️ CI/CD Workflow**
+
+Runs on push or pull request to main branch.
+
 Steps:
-Checkout code
-Setup Python
-Install dependencies
-Setup NLTK resources
-Run unit tests only
-Build Docker image
-Run Docker container for verification
+- Checkout code
+- Setup Python
+- Install dependencies
+- Setup NLTK resources
+- Run unit tests
+- Build Docker image
+- Run Docker container for verification
 
-Integration tests are excluded from CI/CD to keep pipelines fast.
+Integration tests run on `workflow_dispatch` only (they load real HuggingFace models and require secrets).
 
-📈 Extending the Platform
-Add new agents → Place in agents/ and update orchestrator
-Add new metrics → Add to metrics/metrics_tracker.py
-Hugging Face integration → Replace placeholder agent logic with HF models
-Monitoring & Logging → Extend orchestrator to track latency, cost, hallucination live
-🎯 Why This Project Matters
-Demonstrates multi-agent orchestration and RAG architecture
-Provides production-ready evaluation metrics
-Shows modern engineering skills: Docker, CI/CD, testing
-Perfect for portfolio, blog posts, and interview demos
-📄 License
+## **📈 Extending the Platform**
+
+- Add new agents: place implementations in `backend/agents/` and route them in `backend/orchestrator/orchestrator.py`.
+- Add new metrics: implement metric logic in `backend/metrics/metrics_tracker.py`.
+- Add new scoring strategies: add scorer classes in `backend/scoring/` and register them in `backend/scoring/registry.py`.
+- Extend experiment workflows: use `backend/experiments/` and expose routes through `backend/api/`.
+
+## **🎯 Why This Project Matters**
+
+- Demonstrates multi-agent orchestration and RAG architecture.
+- Provides a practical evaluation stack for quality, hallucination, and efficiency metrics.
+- Shows production fundamentals: test coverage, API boundaries, and containerized execution.
+
+## **📄 License**
 
 MIT License. See LICENSE
  for details.
+
+---
+
+## **🔐 Environment Variables**
+
+The backend automatically loads a .env file from the repository root when the backend package is imported.
+
+For Hugging Face access, the preferred key is HF_TOKEN.
+
+Supported token keys:
+- HF_TOKEN
+- HUGGINGFACEHUB_API_TOKEN
+- HUGGINGFACE_HUB_TOKEN
+
+If HF_TOKEN is missing but one of the alias keys is present, the backend maps it to HF_TOKEN automatically.
