@@ -6,12 +6,45 @@ import shutil
 from unittest.mock import patch, MagicMock
 from backend.experiments.runner import ExperimentRunner
 from backend.experiments.tracker import ExperimentTracker
+from backend.experiments.experiment import ExperimentConfig
 from backend.experiments.results import ExperimentResult
+from backend.core.types import RunResult, EvaluationResult, RunBundle
 
 
 class TestExperimentWorkflow(unittest.TestCase):
     def setUp(self):
         self.runner = ExperimentRunner()
+
+    def _make_bundle(
+        self,
+        model: str,
+        score: float,
+        latency: float,
+        cost: float,
+        prompt_tokens: int = 20,
+        output_tokens: int = 10,
+    ) -> RunBundle:
+        total_tokens = prompt_tokens + output_tokens
+        return RunBundle(
+            run=RunResult(
+                output=f"Output for {model} @ {score}",
+                model=model,
+                retrieval="rag",
+                latency=latency,
+                cost=cost,
+                context_used=True,
+                rag_context={},
+                prompt_tokens=prompt_tokens,
+                output_tokens=output_tokens,
+                total_tokens=total_tokens,
+                cost_per_1k_tokens=(cost / max(float(total_tokens), 1.0)) * 1000.0,
+            ),
+            evaluation=EvaluationResult(
+                metrics={"bert_score": score, "latency": latency, "cost": cost},
+                score=score,
+                strategy="balanced",
+            ),
+        )
 
     @patch('backend.experiments.runner.Orchestrator.process_task')
     def test_run_single_experiment(self, mock_process):
@@ -161,6 +194,61 @@ class TestExperimentWorkflow(unittest.TestCase):
         self.assertIsNone(result["comparison"])
         self.assertEqual(result["A"]["output"], "Response A")
         self.assertEqual(result["B"]["output"], "Response B")
+
+    @patch("backend.experiments.runner.Orchestrator.process_task")
+    def test_run_honors_runs_per_input_and_aggregates(self, mock_process):
+        mock_process.side_effect = [
+            self._make_bundle(model="small", score=0.60, latency=1.0, cost=0.001, prompt_tokens=10, output_tokens=5),
+            self._make_bundle(model="small", score=0.90, latency=2.0, cost=0.003, prompt_tokens=30, output_tokens=15),
+        ]
+
+        config = ExperimentConfig(
+            name="exp-runs-per-input",
+            inputs=["Prompt A"],
+            models=["small"],
+            strategy="balanced",
+            runs_per_input=2,
+        )
+
+        result = self.runner.run(config)
+
+        self.assertEqual(mock_process.call_count, 2)
+        aggregated = result.run_matrix["Prompt A"]["small"]
+        self.assertAlmostEqual(aggregated.evaluation.score, 0.75, places=5)
+        self.assertAlmostEqual(aggregated.run.latency, 1.5, places=5)
+        self.assertAlmostEqual(aggregated.run.cost, 0.002, places=5)
+        self.assertEqual(aggregated.run.prompt_tokens, 20)
+        self.assertEqual(aggregated.run.output_tokens, 10)
+        self.assertEqual(aggregated.run.total_tokens, 30)
+        self.assertAlmostEqual(aggregated.run.cost_per_1k_tokens, (0.0666666667 + 0.0666666667) / 2, places=4)
+
+    @patch("backend.experiments.runner.Orchestrator.process_task")
+    def test_run_logs_each_iteration(self, mock_process):
+        mock_process.side_effect = [
+            self._make_bundle(model="small", score=0.7, latency=1.0, cost=0.001),
+            self._make_bundle(model="small", score=0.8, latency=1.1, cost=0.0011),
+            self._make_bundle(model="large", score=0.75, latency=1.2, cost=0.0012),
+            self._make_bundle(model="large", score=0.85, latency=1.3, cost=0.0013),
+        ]
+
+        config = ExperimentConfig(
+            name="exp-log-iterations",
+            inputs=["Prompt A"],
+            models=["small", "large"],
+            strategy="balanced",
+            runs_per_input=2,
+        )
+
+        with patch.object(self.runner.tracker, "log") as mock_log:
+            self.runner.run(config)
+
+        # 1 input x 2 models x 2 iterations
+        self.assertEqual(mock_log.call_count, 4)
+
+        logged_iterations = sorted(call.args[0]["run_iteration"] for call in mock_log.call_args_list)
+        self.assertEqual(logged_iterations, [1, 1, 2, 2])
+        for call in mock_log.call_args_list:
+            self.assertEqual(call.kwargs["experiment_id"], "exp-log-iterations")
 
 
 class TestExperimentTracker(unittest.TestCase):

@@ -1,4 +1,4 @@
-from backend.scoring.base import BaseScorer
+from backend.scoring.base import BaseScorer, output_length_penalty
 
 
 class RAGScorer(BaseScorer):
@@ -9,9 +9,11 @@ class RAGScorer(BaseScorer):
 
         context_used = metrics.get("context_used", 0.0)
 
-        return (
+        score = (
             (0.4 * bert)
             + (0.4 * faith)
             + (0.2 * context_used)
             - (0.3 * halluc)
         )
+
+        return score - output_length_penalty(metrics)

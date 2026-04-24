@@ -107,32 +107,70 @@ class MetricsTracker:
         # -------------------------
         # NORMAL MODE
         # -------------------------
-        if isinstance(reference, list):
-            reference = " ".join(reference)
-
         results = {}
+        references = self._normalize_references(reference)
 
         # Reference-based metrics
-        if reference:
-            results["bert_score"] = _coerce_bert_score(bert_score(output, reference))
-            results["bleu"] = self.bleu(output, reference)
-            results["rouge"] = self.rouge(output, reference)
-            results["perplexity"] = self.perplexity(output, reference)
-            results["hallucination"] = self.hallucination_rate(
-                output, _tokenize(reference)
-            )
+        if references:
+            if len(references) == 1:
+                ref_metrics = self._compute_reference_metrics(output, references[0])
+            else:
+                candidates = [self._compute_reference_metrics(output, ref) for ref in references]
+                ref_metrics = max(candidates, key=self._reference_candidate_rank)
+
+            results["bert_score"] = ref_metrics["bert_score"]
+            results["bleu"] = ref_metrics["bleu"]
+            results["rouge"] = ref_metrics["rouge"]
+            results["perplexity"] = ref_metrics["perplexity"]
+            results["hallucination"] = ref_metrics["hallucination"]
+            results["multi_reference_count"] = float(len(references))
         else:
             results["bert_score"] = 0.0
             results["bleu"] = 0.0
             results["rouge"] = 0.0
             results["perplexity"] = 0.0
             results["hallucination"] = 0.0
+            results["multi_reference_count"] = 0.0
 
         # Always-on metrics
         results["faithfulness"] = self.faithfulness(output, chunks)
         results["diversity"] = self.diversity_score(output)
 
         return results
+
+    def _normalize_references(self, reference):
+        if reference is None:
+            return []
+
+        if isinstance(reference, str):
+            ref = reference.strip()
+            return [ref] if ref else []
+
+        if isinstance(reference, list):
+            refs = [str(r).strip() for r in reference if str(r).strip()]
+            return refs
+
+        ref = str(reference).strip()
+        return [ref] if ref else []
+
+    def _compute_reference_metrics(self, output, reference):
+        return {
+            "bert_score": _coerce_bert_score(bert_score(output, reference)),
+            "bleu": self.bleu(output, reference),
+            "rouge": self.rouge(output, reference),
+            "perplexity": self.perplexity(output, reference),
+            "hallucination": self.hallucination_rate(output, _tokenize(reference)),
+        }
+
+    def _reference_candidate_rank(self, metrics):
+        rouge = metrics.get("rouge") or {}
+        rouge1 = rouge.get("rouge1", 0.0) if isinstance(rouge, dict) else 0.0
+        return (
+            (0.5 * float(metrics.get("bert_score", 0.0)))
+            + (0.2 * float(metrics.get("bleu", 0.0)))
+            + (0.2 * float(rouge1))
+            - (0.1 * float(metrics.get("hallucination", 0.0)))
+        )
 
     # =====================================================
     # SAFE METRIC IMPLEMENTATIONS (CI FRIENDLY)

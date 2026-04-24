@@ -55,10 +55,15 @@ class Orchestrator:
         output = agent.run(prompt)
         latency = time.time() - start
 
+        prompt_tokens = len((prompt or "").split())
+        output_tokens = len((output or "").split())
+        total_tokens = prompt_tokens + output_tokens
+
         # -------------------------
         # 6. Cost
         # -------------------------
-        cost = len(output.split()) * 0.00001
+        cost = output_tokens * 0.00001
+        cost_per_1k_tokens = (cost / max(float(total_tokens), 1.0)) * 1000.0
 
         # -------------------------
         # 7. Evaluation (NO scorer registry here)
@@ -70,7 +75,10 @@ class Orchestrator:
             chunks=chunk_texts,
             strategy=strategy,
             cost=cost,
-            latency=latency
+            latency=latency,
+            prompt_token_count=float(prompt_tokens),
+            output_token_count=float(output_tokens),
+            total_token_count=float(total_tokens),
         )
 
         # -------------------------
@@ -83,7 +91,11 @@ class Orchestrator:
             latency=latency,
             cost=cost,
             context_used=len(chunks) > 0,
-            rag_context=context.to_debug()
+            rag_context=context.to_debug(),
+            prompt_tokens=prompt_tokens,
+            output_tokens=output_tokens,
+            total_tokens=total_tokens,
+            cost_per_1k_tokens=cost_per_1k_tokens,
         )
 
         return RunBundle(run=run, evaluation=evaluation)

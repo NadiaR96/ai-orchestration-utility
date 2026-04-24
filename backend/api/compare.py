@@ -22,17 +22,21 @@ def compare_v2(request: CompareRequest):
     # -------------------------
     # 1. Run models
     # -------------------------
+    task = {"input": request.input, "reference": request.reference} if request.reference else request.input
+
     for model in request.models:
 
         bundle = orchestrator.process_task(
-            task=request.input,
+            task=task,
             model=model,
+            retrieval=request.retrieval,
             strategy=request.strategy
         )
 
         tracker.log(
             {
                 "source": "live",
+                "use_case": request.use_case,
                 "input": request.input,
                 "model": bundle.run.model,
                 "output": bundle.run.output,
@@ -40,6 +44,10 @@ def compare_v2(request: CompareRequest):
                 "strategy": bundle.evaluation.strategy,
                 "latency": bundle.run.latency,
                 "cost": bundle.run.cost,
+                "prompt_tokens": bundle.run.prompt_tokens,
+                "output_tokens": bundle.run.output_tokens,
+                "total_tokens": bundle.run.total_tokens,
+                "cost_per_1k_tokens": bundle.run.cost_per_1k_tokens,
                 "retrieval": bundle.run.retrieval,
                 "context_used": bundle.run.context_used,
                 "rag_context": bundle.run.rag_context,

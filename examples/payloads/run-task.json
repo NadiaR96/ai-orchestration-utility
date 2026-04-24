@@ -1,5 +1,6 @@
 {
   "input": "Explain retrieval augmented generation in two sentences.",
   "model": "small",
-  "strategy": "balanced"
+  "strategy": "balanced",
+  "reference": "Retrieval Augmented Generation (RAG) combines a retrieval step with a language model to ground responses in external knowledge, reducing hallucinations and improving factual accuracy."
 }

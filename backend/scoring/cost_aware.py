@@ -1,4 +1,4 @@
-from backend.scoring.base import BaseScorer
+from backend.scoring.base import BaseScorer, output_length_penalty
 
 
 class CostAwareScorer(BaseScorer):
@@ -16,8 +16,10 @@ class CostAwareScorer(BaseScorer):
             - (0.3 * halluc)
         )
 
-        return (
+        score = (
             base
             - (0.2 * cost)
             - (0.2 * latency)
         )
+
+        return score - output_length_penalty(metrics)

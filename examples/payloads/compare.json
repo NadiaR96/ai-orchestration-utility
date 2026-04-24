@@ -1,5 +1,6 @@
 {
   "input": "Summarize the benefits of using RAG systems.",
   "models": ["small", "quality"],
-  "strategy": "balanced"
+  "strategy": "balanced",
+  "reference": "RAG systems improve LLM outputs by grounding generation in retrieved context, reducing hallucination rates and increasing factual precision."
 }

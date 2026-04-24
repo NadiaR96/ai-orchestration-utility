@@ -4,10 +4,12 @@ from backend.scoring.quality import QualityScorer
 from backend.scoring.cost_aware import CostAwareScorer
 from backend.scoring.rag_aware import RAGScorer
 from backend.scoring.balanced import BalancedScorer
+from backend.scoring.latency_aware import LatencyAwareScorer
 
 SCORERS = {
     "quality": QualityScorer(),
     "cost_aware": CostAwareScorer(),
+    "latency_aware": LatencyAwareScorer(),
     "rag": RAGScorer(),
     "balanced": BalancedScorer(),
 }

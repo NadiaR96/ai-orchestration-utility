@@ -82,45 +82,105 @@ ai-orchestration-utility/
 
 ```mermaid
 flowchart TD
-  C[Client / UI / Scripts] --> API[FastAPI API Layer\nbackend/api]
+  C[Client / Streamlit / Scripts]
 
-  API --> RT[/POST /run-task/]
-  API --> CMP[/POST /compare/]
-  API --> LBP[/POST /leaderboard/]
-  API --> LBG[/GET /leaderboard/]
-  API --> H[/GET /health/]
+  subgraph API_LAYER[API Layer - backend/api]
+    API[FastAPI Router]
+    RT[/POST /run-task/]
+    CMP[/POST /compare/]
+    LBP[/POST /leaderboard/]
+    LBG[/GET /leaderboard/]
+    LBE[/GET /leaderboard/experiments/]
+    LBL[/GET /leaderboard/live/]
+    EXP[/POST /experiments/experiment/]
+    REC[/GET /recommend/]
+    H[/GET /health/]
+  end
 
-  RT --> ORCH[Orchestrator\nbackend/orchestrator]
+  subgraph ORCH_LAYER[Orchestration Layer - backend/orchestrator]
+    ORCH[Orchestrator]
+    MODEL[Model Registry\nbackend/models]
+    AGENT[HF Agent\nbackend/agents]
+  end
+
+  subgraph RAG_LAYER[RAG Layer - backend/rag]
+    RAG[Retriever + Context + Prompt Builder]
+  end
+
+  subgraph EVAL_LAYER[Evaluation Layer - backend/evaluators + backend/metrics + backend/scoring]
+    EVAL[Evaluator]
+    METRICS[Metrics Tracker]
+    NORM[Normaliser]
+    SCORE[Scoring Registry\n(balanced, quality, cost_aware, latency_aware, rag)]
+    COMP[Comparator]
+  end
+
+  subgraph EXP_LAYER[Experiment Layer - backend/experiments]
+    RUNNER[Experiment Runner]
+    TRACKER[Experiment Tracker]
+    LOGS[(experiments/logs.jsonl)]
+  end
+
+  subgraph REC_LAYER[Recommendation Layer - backend/recommender]
+    RECO[Recommendation Engine]
+  end
+
+  subgraph CORE_LAYER[Core Types - backend/core]
+    RESP[Typed Responses]
+  end
+
+  C --> API
+  API --> RT
+  API --> CMP
+  API --> LBP
+  API --> LBG
+  API --> LBE
+  API --> LBL
+  API --> EXP
+  API --> REC
+  API --> H
+
+  RT --> ORCH
   CMP --> ORCH
   LBP --> ORCH
+  EXP --> RUNNER
 
-  ORCH --> MODEL[Model Registry\nbackend/models]
-  ORCH --> AGENT[HF Agent\nbackend/agents]
-  ORCH --> RAG[RAG Pipeline\nbackend/rag]
-  ORCH --> EVAL[Evaluator\nbackend/evaluators]
+  ORCH --> MODEL
+  ORCH --> AGENT
+  ORCH --> RAG
+  ORCH --> EVAL
 
-  EVAL --> METRICS[Metrics Tracker\nbackend/metrics]
-  EVAL --> NORM[Normaliser\nbackend/evaluators]
-  EVAL --> SCORE[Scoring Registry\nbackend/scoring]
+  EVAL --> METRICS
+  EVAL --> NORM
+  EVAL --> SCORE
 
-  CMP --> COMP[Comparator\nbackend/evaluators]
+  CMP --> COMP
   LBP --> COMP
   LBG --> COMP
+  LBE --> COMP
+  LBL --> COMP
 
-  LBG --> LOGS[(experiments/logs.jsonl)]
-  ORCH --> TRACKER[Experiment Tracker\nbackend/experiments]
+  RUNNER --> ORCH
+  RUNNER --> TRACKER
+  REC --> RECO
+
+  ORCH --> TRACKER
   TRACKER --> LOGS
+  LBG --> LOGS
+  LBE --> LOGS
+  LBL --> LOGS
+  RECO --> LOGS
 
-  API --> RESP[Typed Responses\nbackend/core/types]
+  API --> RESP
 ```
 
-### **Request Flow (Prompt-Based)**
+### **Request Flow**
 
-1. Client calls an endpoint (`/run-task`, `/compare`, or `POST /leaderboard`).
+1. Client calls an endpoint (`/run-task`, `/compare`, `POST /leaderboard`, `GET /recommend`, or `POST /experiments/experiment`).
 2. API invokes `Orchestrator.process_task(...)` per requested model.
 3. Orchestrator performs retrieval, prompt building, generation, and evaluation.
-4. Metrics are normalized and scored via registered scoring strategies.
-5. API returns typed response payloads (run details, evaluation, rankings, and narratives).
+4. Metrics are normalized and scored via registered scoring strategies; recommendation requests are aggregated by the recommendation engine from logs.
+5. API returns typed response payloads (run details, evaluation contracts, rankings, and narratives).
 
 ### **Leaderboard Modes**
 
@@ -179,6 +239,26 @@ Use the examples in [`examples/`](examples/) for ready-made requests:
 - [`examples/payloads/compare.json`](examples/payloads/compare.json)
 - [`examples/payloads/leaderboard-prompt.json`](examples/payloads/leaderboard-prompt.json)
 
+### **8️⃣ Lightweight Streamlit UI (optional)**
+
+Run the backend first:
+
+```bash
+uvicorn backend.main:app --reload --host localhost --port 8000
+```
+
+In another terminal, start Streamlit:
+
+```bash
+streamlit run frontend/streamlit_app.py
+```
+
+The UI includes:
+- Interactive tables for compare, recommendation, and live degradation views.
+- Winner highlighting in compare and recommendation scenarios.
+- Explicit trade-off summaries (quality vs latency vs cost).
+- Explicit degradation indicators from live trend direction and delta.
+
 ## **🧭 API Endpoints**
 
 | Method | Path | Purpose | Example |
@@ -189,11 +269,12 @@ Use the examples in [`examples/`](examples/) for ready-made requests:
 | `POST` | `/leaderboard` | Prompt-based leaderboard across all scoring systems | [`examples/payloads/leaderboard-prompt.json`](examples/payloads/leaderboard-prompt.json) |
 | `GET` | `/leaderboard` | Backward-compatible historical leaderboard alias | [`examples/requests.http`](examples/requests.http) |
 | `GET` | `/leaderboard/experiments` | Experiment-backed leaderboard (latest run per model) | [`examples/requests.http`](examples/requests.http) |
-| `GET` | `/leaderboard/live` | Live monitoring leaderboard (window + min samples) | [`examples/requests.http`](examples/requests.http) |
+| `GET` | `/leaderboard/live` | Live monitoring leaderboard (window + min samples + ranking basis) | [`examples/requests.http`](examples/requests.http) |
+| `GET` | `/recommend` | Recommend best model for a use-case and scoring strategy | [`examples/requests.http`](examples/requests.http) |
 
 ## **📊 Leaderboard API**
 
-The project now supports model leaderboards across all scoring systems (`balanced`, `quality`, `cost_aware`, `rag`).
+The project now supports model leaderboards across all scoring systems (`balanced`, `quality`, `cost_aware`, `latency_aware`, `rag`).
 
 ### **Prompt-Based Leaderboard**
 
@@ -233,15 +314,60 @@ This endpoint is intended for reproducible benchmark-style rankings sourced from
 
 ### **Live Degradation Leaderboard**
 
-`GET /leaderboard/live?page=1&page_size=10&sort_strategy=balanced&window_hours=24&min_samples=1`
+`GET /leaderboard/live?page=1&page_size=10&sort_strategy=balanced&window_hours=24&min_samples=1&ranking_basis=window_avg`
 
 This endpoint is intended for operational monitoring using recent live calls.
-Each leaderboard item includes trend metadata comparing the current window to the previous window:
 
-- `direction`: `up`, `down`, `stable`, `new`, or `insufficient_history`
-- `delta_score`: change in average score between windows
-- `current_avg_score`, `previous_avg_score`
-- `current_samples`, `previous_samples`
+**Query parameters:**
+- `window_hours` (default `24`, max `168`): time window to load and average runs from
+- `min_samples` (default `1`): minimum runs a model must have within the window to appear
+- `ranking_basis` (`window_avg` | `latest`, default `window_avg`): controls how models are ranked
+  - `window_avg` — ranks by average score across all runs in the current window (recommended)
+  - `latest` — ranks by the most recent run's snapshot score (previous behaviour)
+
+Each leaderboard item includes:
+- `latest_score`: the score of the model's most recent run in the window
+- `sample_count`: total runs included for this model in the window
+- `trend`: metadata comparing the current window to the previous window
+  - `direction`: `up`, `down`, `stable`, `new`, or `insufficient_history`
+  - `delta_score`: change in average score between windows
+  - `current_avg_score`, `previous_avg_score`
+  - `current_samples`, `previous_samples`
+
+## **🤖 Recommendation API**
+
+`GET /recommend?use_case=summarisation&strategy=balanced&top_n=3&min_samples=1&source=all`
+
+Returns the best model for a given task type and scoring strategy, derived from the experiment and/or live logs.
+
+**Query parameters:**
+- `use_case` *(required)*: Task description (e.g. `summarisation`, `code generation`). If log entries carry a matching `use_case` tag, only those are used; otherwise all entries are used as a fallback.
+- `strategy` (default `balanced`): Scoring strategy to rank by (`balanced`, `quality`, `cost_aware`, `latency_aware`, `rag`)
+- `top_n` (default `3`, max `20`): Number of ranked alternatives to include in the response
+- `min_samples` (default `1`): Minimum logged runs a model must have to qualify
+- `source` (default `all`): Log scope — `live`, `experiment`, or `all`
+
+**Response fields:**
+- `best_model`: Name of the recommended model
+- `best_score`: Average strategy score for the best model
+- `validity_status`, `is_valid`, `validity_reasons`: Validity gating result for recommendation quality control
+- `confidence_reasons`: Human-readable guard-rail explanations for the top choice
+- `alternatives`: Ranked list of up to `top_n` models — each with `score`, `sample_count`, `avg_latency`, `avg_cost`, `score_stddev`, `score_delta_from_best`, `confidence`, `p95_latency`, `consistency_above_threshold`
+- `justification`: Human-readable explanation of why this model was chosen
+
+### Canonical Evaluation Contract
+
+The recommendation response includes a canonical nested `evaluation` object for semantic decision state and reliability:
+
+- `evaluation.system_health`: `OK | DEGRADED | FAIL`
+- `evaluation.evaluation_status`: `VALID | WEAK_SIGNAL | INSUFFICIENT_DATA | NOISY | UNSTABLE | INVALID`
+- `evaluation.decision.state`: `RECOMMENDED | CONSTRAINED | ABSTAIN | INVALID`
+- `evaluation.reliability.label`: `LOW | MEDIUM | HIGH | INSUFFICIENT EVIDENCE`
+- `evaluation.failure_analysis.modes`: canonical failure modes (`LOW_QUALITY`, `LOW_SEPARATION`, `INSUFFICIENT_DATA`, `HIGH_VARIANCE`, `COST_DOMINATED`, `LATENCY_DOMINATED`, `ALL_MODELS_WEAK`, `LOW_CONSISTENCY`, `USE_CASE_MISMATCH`, `SCORE_SCALE_DRIFT`)
+
+The nested `evaluation` block is the canonical semantic source of truth.
+
+**Recommendation audit log:** Every call is appended to `recommendations/recommendations.jsonl`.
 
 ## **🛠️ CI/CD Workflow**
 

@@ -112,3 +112,57 @@ class TestMetricsTracker(unittest.TestCase):
         # But still compute faithfulness and diversity
         self.assertIsInstance(results["faithfulness"], float)
         self.assertIsInstance(results["diversity"], float)
+
+    def test_compute_all_nonzero_bleu_rouge_when_reference_provided(self):
+        """Quality metrics must be non-zero when output and reference share tokens."""
+        output = "RAG stands for Retrieval Augmented Generation and improves LLM accuracy."
+        reference = "RAG stands for Retrieval Augmented Generation."
+        results = self.metrics.compute_all(output, reference, [])
+
+        self.assertGreater(results["bleu"], 0.0, "bleu should be > 0 when output overlaps with reference")
+
+        rouge = results["rouge"]
+        self.assertIsInstance(rouge, dict)
+        self.assertGreater(rouge["rouge1"], 0.0, "rouge1 should be > 0 when output overlaps with reference")
+
+    def test_compute_all_quality_zero_when_no_reference(self):
+        """Reference-based metrics must be zero when no reference is passed."""
+        results = self.metrics.compute_all("some output", None, [])
+        self.assertEqual(results["bert_score"], 0.0)
+        self.assertEqual(results["bleu"], 0.0)
+        self.assertEqual(results["hallucination"], 0.0)
+
+    def test_compute_all_with_multiple_references_uses_best_match(self):
+        output = "Paris is the capital of France"
+        references = [
+            "Berlin is the capital of Germany",
+            "Paris is the capital of France",
+        ]
+
+        results = self.metrics.compute_all(output, references, [])
+        self.assertGreaterEqual(results.get("bleu", 0.0), 0.99)
+        self.assertGreaterEqual(results.get("rouge", {}).get("rouge1", 0.0), 0.99)
+        self.assertEqual(results.get("multi_reference_count"), 2.0)
+
+    def test_evaluate_produces_higher_quality_score_with_reference(self):
+        """Quality metrics (bleu, rouge) must be non-zero when reference is provided and zero without."""
+        from backend.evaluators.evaluator import Evaluator
+
+        evaluator = Evaluator()
+        output = "RAG combines retrieval with generation to reduce hallucinations."
+        reference = "RAG retrieval augmented generation reduces hallucination."
+        chunks: list = []
+
+        result_with_ref = evaluator.evaluate(output=output, reference=reference, chunks=chunks, strategy="quality")
+        result_without_ref = evaluator.evaluate(output=output, reference=None, chunks=chunks, strategy="quality")
+
+        self.assertGreater(
+            result_with_ref.metrics.get("quality_norm", 0.0),
+            result_without_ref.metrics.get("quality_norm", 0.0),
+            "quality_norm should be higher when a reference is provided"
+        )
+        self.assertGreater(
+            result_with_ref.metrics.get("bleu", 0.0),
+            0.0,
+            "bleu should be > 0 when output shares tokens with reference"
+        )
