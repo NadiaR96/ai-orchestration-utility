@@ -10,6 +10,7 @@ requested tag the engine falls back to all entries in the chosen source scope.
 """
 
 import json
+import logging
 import os
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -19,6 +20,8 @@ from statistics import pstdev
 from typing import Dict, List, Optional
 
 from backend.scoring.registry import SCORERS
+
+_logger = logging.getLogger(__name__)
 
 LOG_PATH = Path("experiments/logs.jsonl")
 RECOMMENDATION_LOG_PATH = Path("recommendations/recommendations.jsonl")
@@ -704,7 +707,7 @@ class RecommendationEngine:
         return modes
 
     def _persist(self, result: RecommendationResult, source: str) -> None:
-        if os.getenv("RECOMMENDATION_AUDIT_LOG", "1").strip() == "0":
+        if os.getenv("RECOMMENDATION_AUDIT_LOG", "1").lower() in ("0", "false", "no"):
             return
         RECOMMENDATION_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
         record = {
@@ -763,5 +766,5 @@ class RecommendationEngine:
         try:
             with open(RECOMMENDATION_LOG_PATH, "a", encoding="utf-8") as f:
                 f.write(json.dumps(record) + "\n")
-        except OSError:
-            pass
+        except OSError as exc:
+            _logger.warning("Recommendation audit log write failed: %s", exc)
