@@ -10,6 +10,7 @@ requested tag the engine falls back to all entries in the chosen source scope.
 """
 
 import json
+import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -310,6 +311,15 @@ class RecommendationEngine:
             decision_state = "CONSTRAINED_RECOMMENDATION"
         else:
             decision_state = "RECOMMENDED"
+
+        # Derive recommendation_available consistently from decision_state so it
+        # is never True for INVALID or ABSTAIN states, regardless of which gate
+        # triggered the INVALID condition (e.g. <3 samples, below validity
+        # threshold, or ALL_MODELS_WEAK).
+        recommendation_available = decision_state in {
+            "RECOMMENDED",
+            "CONSTRAINED_RECOMMENDATION",
+        }
 
         system_state, decision_result = self._derive_system_decision_outputs(decision_state)
 
@@ -694,6 +704,8 @@ class RecommendationEngine:
         return modes
 
     def _persist(self, result: RecommendationResult, source: str) -> None:
+        if os.getenv("RECOMMENDATION_AUDIT_LOG", "1").strip() == "0":
+            return
         RECOMMENDATION_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
         record = {
             "timestamp": datetime.utcnow().isoformat(),
@@ -748,5 +760,8 @@ class RecommendationEngine:
             ],
             "justification": result.justification,
         }
-        with open(RECOMMENDATION_LOG_PATH, "a", encoding="utf-8") as f:
-            f.write(json.dumps(record) + "\n")
+        try:
+            with open(RECOMMENDATION_LOG_PATH, "a", encoding="utf-8") as f:
+                f.write(json.dumps(record) + "\n")
+        except OSError:
+            pass

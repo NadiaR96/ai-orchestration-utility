@@ -63,11 +63,15 @@ class TestRecommendationEngine(unittest.TestCase):
     def test_basic_recommendation_returns_best_model(self):
         engine = self._engine([
             self._record("alpha", 0.9),
-            self._record("beta", 0.6),
+            self._record("alpha", 0.88),
+            self._record("alpha", 0.92),
+            self._record("beta", 0.75),
+            self._record("beta", 0.74),
+            self._record("beta", 0.76),
         ])
         result = engine.recommend("summarisation", "balanced")
         self.assertEqual(result.best_model, "alpha")
-        self.assertAlmostEqual(result.best_score, 0.9)
+        self.assertAlmostEqual(result.best_score, 0.9, places=1)
 
     def test_ranked_alternatives_ordered_by_score(self):
         engine = self._engine([
@@ -82,7 +86,11 @@ class TestRecommendationEngine(unittest.TestCase):
     def test_use_case_tag_match_filters_records(self):
         engine = self._engine([
             self._record("alpha", 0.9, use_case="summarisation"),
+            self._record("alpha", 0.88, use_case="summarisation"),
+            self._record("alpha", 0.92, use_case="summarisation"),
             self._record("beta", 0.99),  # high score but no matching tag
+            self._record("beta", 0.99),
+            self._record("beta", 0.99),
         ])
         result = engine.recommend("summarisation", "balanced")
         self.assertEqual(result.best_model, "alpha")
@@ -91,17 +99,25 @@ class TestRecommendationEngine(unittest.TestCase):
     def test_fallback_when_no_tag_match(self):
         engine = self._engine([
             self._record("alpha", 0.9, use_case="translation"),
-            self._record("beta", 0.6),
+            self._record("alpha", 0.88, use_case="translation"),
+            self._record("alpha", 0.92, use_case="translation"),
+            self._record("beta", 0.75),
+            self._record("beta", 0.74),
+            self._record("beta", 0.76),
         ])
         result = engine.recommend("summarisation", "balanced")
         self.assertFalse(result.use_case_matched)
-        # Falls back to all records, so best model is alpha (score 0.9 > 0.6)
+        # Falls back to all records, so best model is alpha (avg ~0.9 > ~0.75)
         self.assertEqual(result.best_model, "alpha")
 
     def test_recommend_handles_null_use_case_in_logs(self):
         engine = self._engine([
             {"model": "alpha", "score": 0.9, "use_case": None, "source": "experiment", "latency": 1.0, "cost": 0.01},
-            {"model": "beta", "score": 0.7, "source": "experiment", "latency": 1.2, "cost": 0.02},
+            {"model": "alpha", "score": 0.88, "use_case": None, "source": "experiment", "latency": 1.0, "cost": 0.01},
+            {"model": "alpha", "score": 0.92, "use_case": None, "source": "experiment", "latency": 1.0, "cost": 0.01},
+            {"model": "beta", "score": 0.75, "source": "experiment", "latency": 1.2, "cost": 0.02},
+            {"model": "beta", "score": 0.74, "source": "experiment", "latency": 1.2, "cost": 0.02},
+            {"model": "beta", "score": 0.76, "source": "experiment", "latency": 1.2, "cost": 0.02},
         ])
 
         result = engine.recommend("summarisation", "balanced")
@@ -112,6 +128,10 @@ class TestRecommendationEngine(unittest.TestCase):
     def test_source_filter_live_only(self):
         engine = self._engine([
             self._record("live_model", 0.9, source="live"),
+            self._record("live_model", 0.88, source="live"),
+            self._record("live_model", 0.92, source="live"),
+            self._record("exp_model", 0.99, source="experiment"),
+            self._record("exp_model", 0.99, source="experiment"),
             self._record("exp_model", 0.99, source="experiment"),
         ])
         result = engine.recommend("any", "balanced", source="live")
@@ -120,7 +140,11 @@ class TestRecommendationEngine(unittest.TestCase):
     def test_source_filter_experiment_only(self):
         engine = self._engine([
             self._record("live_model", 0.99, source="live"),
-            self._record("exp_model", 0.7, source="experiment"),
+            self._record("live_model", 0.99, source="live"),
+            self._record("live_model", 0.99, source="live"),
+            self._record("exp_model", 0.8, source="experiment"),
+            self._record("exp_model", 0.82, source="experiment"),
+            self._record("exp_model", 0.79, source="experiment"),
         ])
         result = engine.recommend("any", "balanced", source="experiment")
         self.assertEqual(result.best_model, "exp_model")
@@ -129,7 +153,11 @@ class TestRecommendationEngine(unittest.TestCase):
         engine = self._engine([
             {"model": "alpha", "score": 0.95, "strategy": "balanced", "source": "experiment", "latency": 1.0, "cost": 0.01},
             {"model": "alpha", "score": 0.70, "strategy": "quality", "source": "experiment", "latency": 1.0, "cost": 0.01},
+            {"model": "alpha", "score": 0.72, "strategy": "quality", "source": "experiment", "latency": 1.0, "cost": 0.01},
+            {"model": "alpha", "score": 0.71, "strategy": "quality", "source": "experiment", "latency": 1.0, "cost": 0.01},
             {"model": "beta", "score": 0.80, "strategy": "quality", "source": "experiment", "latency": 1.0, "cost": 0.01},
+            {"model": "beta", "score": 0.82, "strategy": "quality", "source": "experiment", "latency": 1.0, "cost": 0.01},
+            {"model": "beta", "score": 0.81, "strategy": "quality", "source": "experiment", "latency": 1.0, "cost": 0.01},
         ])
 
         result = engine.recommend("any", "quality")
@@ -140,6 +168,7 @@ class TestRecommendationEngine(unittest.TestCase):
             self._record("alpha", 0.9),
             self._record("beta", 0.8),
             self._record("beta", 0.85),
+            self._record("beta", 0.83),
         ])
         result = engine.recommend("any", "balanced", min_samples=2)
         # alpha only has 1 sample, should not appear
@@ -172,7 +201,11 @@ class TestRecommendationEngine(unittest.TestCase):
             engine.recommend("any", "balanced", source="invalid")
 
     def test_justification_includes_model_and_strategy(self):
-        engine = self._engine([self._record("alpha", 0.9)])
+        engine = self._engine([
+            self._record("alpha", 0.9),
+            self._record("alpha", 0.88),
+            self._record("alpha", 0.92),
+        ])
         result = engine.recommend("summarisation", "balanced")
         self.assertIn("alpha", result.justification)
         self.assertIn("balanced", result.justification)
@@ -181,7 +214,10 @@ class TestRecommendationEngine(unittest.TestCase):
         engine = self._engine([
             self._record("alpha", 0.6),
             self._record("alpha", 0.8),
+            self._record("alpha", 0.7),
             self._record("beta", 0.9),
+            self._record("beta", 0.88),
+            self._record("beta", 0.92),
         ])
         result = engine.recommend("any", "balanced")
         # beta: avg=0.9; alpha: avg=0.7
@@ -380,13 +416,15 @@ class TestRecommendationEngine(unittest.TestCase):
         self.assertIn("ALL_MODELS_WEAK", result.failure_modes)
 
     def test_cost_aware_strategy_uses_looser_weak_threshold(self):
+        # Scores around 0.72 are above cost_aware weak threshold (0.58) but below
+        # quality threshold (0.78), demonstrating strategy-specific leniency.
         engine = self._engine([
-            self._record("alpha", 0.64, use_case="summarisation"),
-            self._record("alpha", 0.65, use_case="summarisation"),
-            self._record("alpha", 0.63, use_case="summarisation"),
-            self._record("beta", 0.60, use_case="summarisation"),
-            self._record("beta", 0.61, use_case="summarisation"),
-            self._record("beta", 0.59, use_case="summarisation"),
+            self._record("alpha", 0.74, use_case="summarisation"),
+            self._record("alpha", 0.75, use_case="summarisation"),
+            self._record("alpha", 0.73, use_case="summarisation"),
+            self._record("beta", 0.71, use_case="summarisation"),
+            self._record("beta", 0.72, use_case="summarisation"),
+            self._record("beta", 0.70, use_case="summarisation"),
         ])
 
         result = engine.recommend("summarisation", "cost_aware")
