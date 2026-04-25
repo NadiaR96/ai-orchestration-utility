@@ -17,8 +17,7 @@ The platform runs multiple models through a shared evaluation pipeline, applies 
 ---
 
 ## 🏗️ System Overview
-```
-Mermaid
+```Mermaid
 flowchart TD
 
     A[Task Input / Prompt]
