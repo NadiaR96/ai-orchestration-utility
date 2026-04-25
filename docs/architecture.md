@@ -28,7 +28,7 @@ flowchart TD
 ```
 
 ## 🧩 Core Components
-** Orchestrator **
+**Orchestrator**
 
 Handles:
 
