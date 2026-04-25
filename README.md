@@ -38,7 +38,7 @@ flowchart TD
     C --> D
     D --> E
     E --> F
-    F --> G-> G
+    F --> G
 ```
 
 ## 🚀 Key Features
