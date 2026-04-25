@@ -27,7 +27,7 @@ flowchart TD
 
     D[Evaluation Engine<br/>metrics: BLEU, ROUGE, BERTScore, hallucination]
     
-    E[Scoring Strategy Layer<br/>balanced | quality | cost | latency]
+    E[Scoring Strategy Layer<br/>balanced, quality, cost, latency]
 
     F[Ranking + Leaderboard]
 
