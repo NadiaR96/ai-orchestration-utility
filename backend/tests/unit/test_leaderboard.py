@@ -107,12 +107,12 @@ class TestLeaderboardHelpers(unittest.TestCase):
         entry = entries[0]
         entry.latest_score = 0.8
         entry._window_avg_score = 0.4  # type: ignore[attr-defined]
-        original_balanced = entry.scores_by_strategy["balanced"]
 
         leaderboard._apply_window_avg_scores(entries, "balanced")
 
-        # After applying, balanced score should be ~half the original (ratio=0.5)
-        self.assertAlmostEqual(entry.scores_by_strategy["balanced"], original_balanced * 0.5, places=5)
+        # The sort_strategy score is used as the baseline for the ratio, so after
+        # applying, the balanced score equals the window average (ratio cancels out).
+        self.assertAlmostEqual(entry.scores_by_strategy["balanced"], 0.4, places=5)
 
     def test_apply_window_avg_scores_no_avg_unchanged(self):
         run = self._make_run("m", latency=1.0, cost=0.01)

@@ -339,7 +339,10 @@ def _apply_window_avg_scores(
             continue
         # Scale all per-strategy scores proportionally so relative strategy
         # differences are kept, but the sort_strategy drives the primary rank.
-        latest = entry.latest_score
+        # Use the current sort_strategy score as the baseline so the ratio is
+        # grounded in the correct strategy, even when log records contain mixed
+        # strategy values.
+        latest = entry.scores_by_strategy.get(sort_strategy)
         if latest and latest > 0.0:
             ratio = avg / latest
             entry.scores_by_strategy = {
