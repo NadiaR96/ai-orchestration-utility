@@ -18,13 +18,12 @@ The platform runs multiple models through a shared evaluation pipeline, applies 
 
 ## 🏗️ System Overview
 flowchart TD
-  Input[Task Input]
-  Models[Multi-Model Execution]
-  Eval[Evaluation Layer]
-  Score[Scoring Strategy]
-  Rank[Ranking + Recommendation]
-
-  Input --> Models --> Eval --> Score --> Rank
+    Input[Task Input]
+    Models[Multi-model Execution]
+    Eval[Evaluation Layer]
+    Score[Scoring Strategy]
+    Rank[Ranking + Recommendation]
+Input --> Models --> Eval --> Score --> Rank
 
 ## 🚀 Key Features
 - Multi-model orchestration pipeline
