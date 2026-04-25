@@ -17,13 +17,29 @@ The platform runs multiple models through a shared evaluation pipeline, applies 
 ---
 
 ## 🏗️ System Overview
+```
 flowchart TD
-    Input[Task Input]
-    Models[Multi-model Execution]
-    Eval[Evaluation Layer]
-    Score[Scoring Strategy]
-    Rank[Ranking + Recommendation]
-Input --> Models --> Eval --> Score --> Rank
+
+    A[Task Input / Prompt]
+
+    B[Multi-Model Orchestration]
+    C[LLM Execution Layer]
+
+    D[Evaluation Engine<br/>metrics: BLEU, ROUGE, BERTScore, hallucination]
+    
+    E[Scoring Strategy Layer<br/>balanced | quality | cost | latency]
+
+    F[Ranking + Leaderboard]
+
+    G[Recommendation Engine]
+
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    E --> F
+    F --> G
+```
 
 ## 🚀 Key Features
 - Multi-model orchestration pipeline
