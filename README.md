@@ -1,65 +1,109 @@
+
 # LLM Evaluation Platform
 
-A modular system for evaluating, comparing, and ranking LLM outputs under real-world constraints such as quality, cost, and latency.
+A system for evaluating, comparing, and ranking LLM outputs under real-world constraints (quality, cost, latency).
 
-The platform runs multiple models through a shared evaluation pipeline, applies configurable scoring strategies, and produces ranked recommendations and experiment results.
+It provides a reproducible pipeline for multi-model evaluation, configurable scoring strategies, and recommendation-based model selection.
 
 ---
 
 ## ⚡ 10-Second Summary
 
-- Runs multiple LLMs on the same task
-- Evaluates outputs using structured metrics
-- Applies configurable scoring strategies
-- Produces rankings + recommendations
-- Supports reproducible experimentation
+A production-style evaluation system that:
+
+- runs multiple LLMs on identical inputs
+- evaluates outputs using structured metrics
+- applies trade-off-aware scoring strategies
+- ranks models and generates recommendations
+- supports reproducible experimentation
+
+---
+
+## 🧠 Why this exists
+
+LLM outputs are:
+- non-deterministic
+- difficult to compare objectively
+- sensitive to cost/latency trade-offs
+
+This system formalises evaluation into a **repeatable decision pipeline**.
 
 ---
 
 ## 🏗️ System Overview
+
 ```mermaid
 flowchart TD
 
-    A[Task Input / Prompt]
+A[Task Input]
+B[Multi-Model Orchestration]
+C[LLM Execution Layer]
+D[Evaluation Engine]
+E[Scoring Strategy Layer]
+F[Ranking System]
+G[Recommendation Engine]
 
-    B[Multi-Model Orchestration]
-    C[LLM Execution Layer]
-
-    D[Evaluation Engine<br/>metrics: BLEU, ROUGE, BERTScore, hallucination]
-    
-    E[Scoring Strategy Layer<br/>balanced, quality, cost, latency]
-
-    F[Ranking + Leaderboard]
-
-    G[Recommendation Engine]
-
-    A --> B
-    B --> C
-    C --> D
-    D --> E
-    E --> F
-    F --> G
+A --> B --> C --> D --> E --> F --> G
 ```
 
-## 🚀 Key Features
-- Multi-model orchestration pipeline
-- Evaluation using BLEU, ROUGE, BERTScore, hallucination metrics
-- Strategy-based scoring (balanced, quality, cost, latency)
-- Recommendation engine with confidence signals
-- Experiment logging for reproducibility
-- Docker + CI/CD support
+## 🧩 Core Design
+1. Orchestration Layer
+
+Executes multiple models against a shared input.
+
+2. Evaluation Layer
+
+Computes structured metrics:
+
+- BLEU / ROUGE
+- BERTScore
+- hallucination / faithfulness signals
+  
+3. Scoring Layer
+
+Applies configurable trade-offs:
+
+- balanced
+- quality-first
+- cost-aware
+- latency-aware
+
+4. Decision Layer
+
+Produces:
+
+- ranked model outputs
+- confidence-weighted recommendations
+- use-case-specific selection
+
+## ⚖️ Engineering Trade-offs
+**Determinism vs Flexibility**
+
+ Metrics are structured but evaluation remains probabilistic.
+
+**Accuracy vs Cost**
+
+Higher evaluation fidelity increases compute cost.
+
+**Interpretability vs Optimality**
+
+Rule-based scoring ensures transparency over black-box ranking.
 
 ## 📊 What this demonstrates
-- Backend system design
-- Evaluation pipeline architecture
-- AI model orchestration
-- Trade-off-aware scoring systems
-- Production engineering practices
+- multi-model orchestration systems
+- evaluation pipeline design
+- scoring + ranking architecture
+- production API design
+- experiment reproducibility
   
-## 📌 Explore deeper
-
-👉 Case Study: docs/case-study.md
-
-👉 Architecture: docs/architecture.md
-
-👉 Evaluation System: docs/evaluation.md
+## 🚀 Key Capabilities
+- Multi-model execution pipeline
+- Configurable evaluation metrics
+- Strategy-based scoring engine
+- Recommendation system with confidence signals
+- Experiment logging and replayability
+- Docker + CI/CD support
+## 📌 Deep Dive
+[Case Study](docs/case-study.md)
+[Architecture](docs/architecture.md)
+Evaluation System: docs/evaluation.md
