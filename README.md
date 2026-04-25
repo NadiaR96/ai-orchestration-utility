@@ -3,26 +3,26 @@
 [![Python](https://img.shields.io/badge/python-3.11-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-A lightweight **multi-agent AI orchestration platform** with metrics tracking, Docker, and CI/CD integration.  
+A modular **LLM evaluation and orchestration platform** with metrics tracking, Docker, and CI/CD integration.  
 Designed for **production-ready experimentation with LLMs**, evaluation of outputs, and orchestration of complex AI tasks.
 
 ---
 
 ## **🚀 Features**
 
-- **Multi-Agent Orchestration**  
-  Run multiple instances of AI agents concurrently with flexible task assignment.
+- **Multi-Model Orchestration**  
+  Run tasks across multiple model profiles with unified retrieval, prompting, evaluation, and comparison.
 
 - **Metrics Tracking**  
   Evaluate AI outputs using:
+  - BERTScore (or token-overlap fallback)  
   - BLEU  
-  - METEOR  
-  - ROUGE  
-  - Cosine Similarity  
-  - Diversity Score  
-  - Coverage Score  
-  - Hallucination Rate  
-  - F1, Precision, Recall  
+  - ROUGE (ROUGE-1, ROUGE-L)  
+  - Perplexity proxy  
+  - Hallucination rate  
+  - Faithfulness to retrieved context  
+  - Diversity score  
+  - Multi-reference best-match scoring  
 
 - **Dockerized Environment**  
   Fully reproducible builds, including NLTK resources.
@@ -111,7 +111,7 @@ flowchart TD
     EVAL[Evaluator]
     METRICS[Metrics Tracker]
     NORM[Normaliser]
-    SCORE[Scoring Registry\nbalanced | quality | cost_aware | latency_aware | rag]
+    SCORE[Scoring Registry\nbalanced, quality, cost_aware, latency_aware, rag]
     COMP[Comparator]
   end
 
@@ -205,6 +205,8 @@ cd ai-orchestration-utility
 pip install -r requirements.txt
 ```
 
+Note: this platform includes heavier ML dependencies (for example `torch`, `transformers`, and `faiss-cpu`), so plan for higher memory and image size in cloud deployments.
+
 ### **3️⃣ Setup NLTK data**
 
 ```bash
@@ -223,12 +225,14 @@ python -m unittest discover -s backend/tests/unit -p "test_*.py"
 python -m unittest discover -s backend/tests -p "test_*.py"
 ```
 
-### **6️⃣ Optional: Run in Docker**
+### **6️⃣ Optional: Run unit tests in Docker**
 
 ```bash
 docker build -t ai-orchestration-utility:latest .
 docker run --rm ai-orchestration-utility:latest
 ```
+
+The default container command runs unit tests (`backend/tests/unit`).
 
 ### **7️⃣ API request examples**
 
@@ -239,7 +243,7 @@ Use the examples in [`examples/`](examples/) for ready-made requests:
 - [`examples/payloads/compare.json`](examples/payloads/compare.json)
 - [`examples/payloads/leaderboard-prompt.json`](examples/payloads/leaderboard-prompt.json)
 
-### **8️⃣ Lightweight Streamlit UI (optional)**
+### **8️⃣ Streamlit UI (optional)**
 
 Run the backend first:
 
@@ -267,6 +271,7 @@ The UI includes:
 | `POST` | `/run-task` | Execute one model run and return run + evaluation | [`examples/payloads/run-task.json`](examples/payloads/run-task.json) |
 | `POST` | `/compare` | Run multiple models and return side-by-side comparison | [`examples/payloads/compare.json`](examples/payloads/compare.json) |
 | `POST` | `/leaderboard` | Prompt-based leaderboard across all scoring systems | [`examples/payloads/leaderboard-prompt.json`](examples/payloads/leaderboard-prompt.json) |
+| `POST` | `/experiments/experiment` | Execute a batch experiment and log results | [`examples/requests.http`](examples/requests.http) |
 | `GET` | `/leaderboard` | Backward-compatible historical leaderboard alias | [`examples/requests.http`](examples/requests.http) |
 | `GET` | `/leaderboard/experiments` | Experiment-backed leaderboard (latest run per model) | [`examples/requests.http`](examples/requests.http) |
 | `GET` | `/leaderboard/live` | Live monitoring leaderboard (window + min samples + ranking basis) | [`examples/requests.http`](examples/requests.http) |
@@ -393,9 +398,26 @@ Integration tests run on `workflow_dispatch` only (they load real HuggingFace mo
 
 ## **🎯 Why This Project Matters**
 
-- Demonstrates multi-agent orchestration and RAG architecture.
+- Demonstrates multi-model orchestration and RAG architecture.
 - Provides a practical evaluation stack for quality, hallucination, and efficiency metrics.
 - Shows production fundamentals: test coverage, API boundaries, and containerized execution.
+
+## **📝 Design Notes**
+- The platform is designed for **production-readiness and extensibility** rather than minimalism. It includes a comprehensive evaluation suite and orchestration capabilities to support real-world experimentation and monitoring.
+- The architecture emphasizes **modularity** with clear separation of concerns across API, orchestration, evaluation, and experiment layers, enabling easy extension and maintenance.
+- The recommendation system is built on a **canonical evaluation contract** to ensure consistent decision logic and reliability assessment, which is crucial for operational use cases.
+- The leaderboard supports both **prompt-based and historical rankings**, with pagination for scalability and a dedicated endpoint for experiment-sourced rankings, reflecting the need for both on-demand evaluation and reproducible benchmarks.
+
+## **️⃣ Future Improvements**
+- Add mean aggregation to leaderboard endpoints.
+- Implement additional evaluation metrics (e.g., factuality, bias).
+- Enhance the recommendation engine with more sophisticated validity gating and confidence estimation.
+- Add support for more model providers and custom model definitions.
+
+## **️⃣ Current Limitations**
+- The current implementation uses a simple JSONL file for experiment logging, which may not scale well for large volumes of runs or concurrent access. Future versions could integrate a more robust database solution.
+- The recommendation engine relies on heuristic-based validity gating and confidence estimation, which may not capture all nuances of model performance. Future iterations could explore more advanced techniques, such as meta-models or causal inference, for improved recommendation quality.
+- The platform currently focuses on text-based tasks and may require adjustments to support other modalities (e.g., vision, audio) or multi-modal tasks.
 
 ## **📄 License**
 
