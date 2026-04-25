@@ -111,7 +111,7 @@ flowchart TD
     EVAL[Evaluator]
     METRICS[Metrics Tracker]
     NORM[Normaliser]
-    SCORE[Scoring Registry\n(balanced, quality, cost_aware, latency_aware, rag)]
+    SCORE[Scoring Registry\nbalanced | quality | cost_aware | latency_aware | rag]
     COMP[Comparator]
   end
 
