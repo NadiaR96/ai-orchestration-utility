@@ -1,4 +1,4 @@
-# AI Orchestration Utility
+# LLM Evaluation Platform
 
 [![Python](https://img.shields.io/badge/python-3.11-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
