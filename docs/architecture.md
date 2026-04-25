@@ -5,6 +5,7 @@
 
 The platform is built as a modular pipeline for LLM evaluation and comparison.
 
+```mermaid
 flowchart TD
   Input[Input Task]
 
@@ -24,7 +25,7 @@ flowchart TD
   end
 
   Input --> O --> M --> E --> S --> L --> R
-
+```
 
 ## 🧩 Core Components
 ** Orchestrator **
