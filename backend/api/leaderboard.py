@@ -176,6 +176,7 @@ def _load_latest_entries_from_logs(
     source_filter: Optional[str] = None,
     window_hours: Optional[int] = None,
     min_samples: int = 1,
+    sort_strategy: Optional[str] = None,
 ) -> List[LeaderboardEntry]:
     if not LOG_PATH.exists():
         return []
@@ -213,7 +214,10 @@ def _load_latest_entries_from_logs(
             counts_by_model[model] = counts_by_model.get(model, 0) + 1
 
             score = record.get("score")
-            if isinstance(score, (int, float)):
+            record_strategy = str(record.get("strategy", "")).lower()
+            if isinstance(score, (int, float)) and (
+                sort_strategy is None or record_strategy == sort_strategy.lower()
+            ):
                 scores_by_model.setdefault(model, []).append(float(score))
 
             timestamp = str(record.get("timestamp", ""))
@@ -508,6 +512,7 @@ def leaderboard_live(
         source_filter=SOURCE_LIVE,
         window_hours=window_hours,
         min_samples=min_samples,
+        sort_strategy=sort_strategy.lower() if ranking_basis == "window_avg" else None,
     )
 
     if ranking_basis == "window_avg":

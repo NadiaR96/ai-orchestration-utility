@@ -26,9 +26,6 @@ class Orchestrator:
             query = task
             reference = None
 
-        if isinstance(reference, list):
-            reference = " ".join(reference)
-
         # -------------------------
         # 2. Model
         # -------------------------

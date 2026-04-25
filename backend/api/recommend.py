@@ -1,3 +1,6 @@
+from typing import Literal
+
+import pydantic
 from fastapi import APIRouter, HTTPException
 
 from backend.api.schemas import (
@@ -82,15 +85,18 @@ def recommend(
     strategy: str = "balanced",
     top_n: int = 3,
     min_samples: int = 1,
-    source: str = "all",
+    source: Literal["live", "experiment", "all"] = "all",
 ):
-    request = RecommendationRequest(
-        use_case=use_case,
-        strategy=strategy,
-        top_n=top_n,
-        min_samples=min_samples,
-        source=source,  # type: ignore[arg-type]
-    )
+    try:
+        request = RecommendationRequest(
+            use_case=use_case,
+            strategy=strategy,
+            top_n=top_n,
+            min_samples=min_samples,
+            source=source,
+        )
+    except pydantic.ValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     try:
         result = _engine.recommend(
             use_case=request.use_case,
