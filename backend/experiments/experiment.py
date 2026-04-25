@@ -9,6 +9,7 @@ class ExperimentConfig:
     models: List[str]
     strategy: str = "balanced"
     runs_per_input: int = 1
+    use_case: Optional[str] = None
 
 
 @dataclass

@@ -46,3 +46,26 @@ class EvaluationNarrativeEngine:
             return "Both models show similar tradeoffs across quality and efficiency."
 
         return f"{winner} selected based on combined quality, cost, and latency tradeoff."
+
+    def selection_reason(
+        self,
+        selected_variant: str,
+        strategy: str,
+        best_score: float,
+        fastest_variant: str,
+        cheapest_variant: str,
+        tie_variants: list | None = None,
+    ) -> str:
+        tie_variants = tie_variants or []
+
+        if tie_variants:
+            tied = ", ".join(tie_variants)
+            return (
+                f"Models selected (tie): {tied} based on {strategy} strategy and trade-offs "
+                f"(best_score={best_score:.4f}, fastest={fastest_variant}, cheapest={cheapest_variant})."
+            )
+
+        return (
+            f"Model selected: {selected_variant} based on {strategy} strategy and trade-offs "
+            f"(best_score={best_score:.4f}, fastest={fastest_variant}, cheapest={cheapest_variant})."
+        )

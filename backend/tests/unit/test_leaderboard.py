@@ -100,6 +100,54 @@ class TestLeaderboardHelpers(unittest.TestCase):
         ordered = [item.model for item in response.items]
         self.assertEqual(ordered, ["gamma", "alpha", "beta"])
 
+    def test_apply_window_avg_scores_scales_proportionally(self):
+        run = self._make_run("m", latency=1.0, cost=0.01)
+        evaluation = self._make_eval(0.8)
+        entries = leaderboard._build_entries_from_runs({"m": run}, {"m": evaluation})
+        entry = entries[0]
+        entry.latest_score = 0.8
+        entry._window_avg_score = 0.4  # type: ignore[attr-defined]
+
+        leaderboard._apply_window_avg_scores(entries, "balanced")
+
+        # The sort_strategy score is used as the baseline for the ratio, so after
+        # applying, the balanced score equals the window average (ratio cancels out).
+        self.assertAlmostEqual(entry.scores_by_strategy["balanced"], 0.4, places=5)
+
+    def test_apply_window_avg_scores_no_avg_unchanged(self):
+        run = self._make_run("m", latency=1.0, cost=0.01)
+        evaluation = self._make_eval(0.8)
+        entries = leaderboard._build_entries_from_runs({"m": run}, {"m": evaluation})
+        entry = entries[0]
+        entry.latest_score = 0.8
+        original = dict(entry.scores_by_strategy)
+
+        leaderboard._apply_window_avg_scores(entries, "balanced")
+
+        self.assertEqual(entry.scores_by_strategy, original)
+
+    def test_window_avg_ranking_beats_latest_snapshot(self):
+        """Model with high avg but lower latest should rank above model with high latest but low avg."""
+        runs = {
+            "consistent": self._make_run("consistent", latency=1.0, cost=0.01),
+            "flashy": self._make_run("flashy", latency=1.0, cost=0.01),
+        }
+        evaluations = {
+            "consistent": self._make_eval(0.7),   # latest=0.7, avg=0.9
+            "flashy": self._make_eval(0.95),       # latest=0.95, avg=0.5
+        }
+        entries = leaderboard._build_entries_from_runs(runs, evaluations)
+        entries[0].latest_score = 0.7
+        entries[0]._window_avg_score = 0.9  # type: ignore[attr-defined]
+        entries[1].latest_score = 0.95
+        entries[1]._window_avg_score = 0.5  # type: ignore[attr-defined]
+
+        leaderboard._apply_window_avg_scores(entries, "balanced")
+        response = leaderboard._rank_and_paginate(entries, "balanced", page=1, page_size=10)
+
+        ordered = [item.model for item in response.items]
+        self.assertEqual(ordered[0], "consistent")
+
 
 if __name__ == "__main__":
     unittest.main()

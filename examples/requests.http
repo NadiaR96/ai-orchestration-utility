@@ -26,3 +26,15 @@ GET {{baseUrl}}/leaderboard?page=1&page_size=10&sort_strategy=balanced&aggregati
 
 ### Leaderboard Historical Mode (Filtered Models)
 GET {{baseUrl}}/leaderboard?page=1&page_size=10&sort_strategy=balanced&aggregation=latest&models=small,quality
+
+### Recommend Best Model (Default Scope)
+# Preset: ./payloads/recommend-all.json
+GET {{baseUrl}}/recommend?use_case=summarisation&strategy=balanced&top_n=3&min_samples=1&source=all
+
+### Recommend Best Model (Live-Only)
+# Preset: ./payloads/recommend-live.json
+GET {{baseUrl}}/recommend?use_case=code_generation&strategy=quality&top_n=5&min_samples=2&source=live
+
+### Recommend Best Model (Experiment-Only)
+# Preset: ./payloads/recommend-experiment.json
+GET {{baseUrl}}/recommend?use_case=summarisation&strategy=balanced&top_n=3&min_samples=1&source=experiment

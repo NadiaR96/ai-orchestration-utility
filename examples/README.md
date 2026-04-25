@@ -9,6 +9,16 @@ This folder contains runnable request examples for every currently exposed endpo
 - POST /compare
 - POST /leaderboard
 - GET /leaderboard
+- GET /recommend
+
+## Payload Files
+
+- `payloads/run-task.json`
+- `payloads/compare.json`
+- `payloads/leaderboard-prompt.json`
+- `payloads/recommend-all.json`
+- `payloads/recommend-live.json`
+- `payloads/recommend-experiment.json`
 
 ## How To Use
 
@@ -30,3 +40,5 @@ Replace path as needed for other payload files in `examples/payloads/`.
 
 - Default base URL in examples is `http://localhost:8000`.
 - `aggregation` for leaderboard currently supports only `latest`.
+- Recommendations can read from `live`, `experiment`, or `all` logs via the `source` query parameter.
+- Recommendation payload files are query presets for `GET /recommend` (they are not request bodies).

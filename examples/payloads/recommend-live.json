@@ -1,0 +1,7 @@
+{
+  "use_case": "code_generation",
+  "strategy": "quality",
+  "top_n": 5,
+  "min_samples": 2,
+  "source": "live"
+}

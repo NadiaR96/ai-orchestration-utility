@@ -71,8 +71,8 @@ class TestComparator(unittest.TestCase):
 
         result = self.comparator.compare_many(evaluations)
 
-        # tie → first wins (stable sort)
-        self.assertEqual(result.winner, "A")
+        self.assertIsNone(result.winner)
+        self.assertEqual(set(result.tied_winners), {"A", "B"})
 
     def test_compare_zero_scores(self):
         a = EvaluationResult(metrics={}, score=0.0, strategy="quality")
@@ -85,7 +85,8 @@ class TestComparator(unittest.TestCase):
 
         result = self.comparator.compare_many(evaluations)
 
-        self.assertEqual(result.winner, "A")
+        self.assertIsNone(result.winner)
+        self.assertEqual(set(result.tied_winners), {"A", "B"})
         self.assertEqual(result.score_breakdown["A"], 0.0)
         self.assertEqual(result.score_breakdown["B"], 0.0)
     def test_compare_negative_scores(self):

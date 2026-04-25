@@ -176,12 +176,14 @@ def _load_latest_entries_from_logs(
     source_filter: Optional[str] = None,
     window_hours: Optional[int] = None,
     min_samples: int = 1,
+    sort_strategy: Optional[str] = None,
 ) -> List[LeaderboardEntry]:
     if not LOG_PATH.exists():
         return []
 
     latest_by_model: Dict[str, dict] = {}
     counts_by_model: Dict[str, int] = {}
+    scores_by_model: Dict[str, List[float]] = {}
     min_timestamp = None
     if window_hours is not None:
         min_timestamp = datetime.utcnow() - timedelta(hours=window_hours)
@@ -211,6 +213,13 @@ def _load_latest_entries_from_logs(
 
             counts_by_model[model] = counts_by_model.get(model, 0) + 1
 
+            score = record.get("score")
+            record_strategy = str(record.get("strategy", "")).lower()
+            if isinstance(score, (int, float)) and (
+                sort_strategy is None or record_strategy == sort_strategy.lower()
+            ):
+                scores_by_model.setdefault(model, []).append(float(score))
+
             timestamp = str(record.get("timestamp", ""))
             existing = latest_by_model.get(model)
             if existing is None or timestamp > str(existing.get("timestamp", "")):
@@ -218,6 +227,8 @@ def _load_latest_entries_from_logs(
 
     runs: Dict[str, RunResult] = {}
     evaluations: Dict[str, EvaluationResult] = {}
+    avg_scores: Dict[str, float] = {}
+    sample_counts: Dict[str, int] = {}
 
     for model, record in latest_by_model.items():
         if counts_by_model.get(model, 0) < min_samples:
@@ -245,8 +256,19 @@ def _load_latest_entries_from_logs(
 
         runs[model] = run
         evaluations[model] = evaluation
+        model_scores = scores_by_model.get(model, [])
+        if model_scores:
+            avg_scores[model] = sum(model_scores) / len(model_scores)
+        sample_counts[model] = counts_by_model.get(model, 0)
 
-    return _build_entries_from_runs(runs, evaluations)
+    entries = _build_entries_from_runs(runs, evaluations)
+    for entry in entries:
+        entry.latest_score = entry.evaluation.score
+        entry.sample_count = sample_counts.get(entry.model, 0)
+        if entry.model in avg_scores:
+            # Store window avg on the entry for use by live ranking
+            entry._window_avg_score = avg_scores[entry.model]  # type: ignore[attr-defined]
+    return entries
 
 
 def _collect_model_score_summary(
@@ -298,6 +320,40 @@ def _collect_model_score_summary(
         }
 
     return summary
+
+
+def _apply_window_avg_scores(
+    entries: List[LeaderboardEntry],
+    sort_strategy: str,
+) -> None:
+    """Replace the per-strategy scores used for ranking with the window average score.
+
+    The window average is computed over all runs in the current window for each
+    model (stored as ``_window_avg_score`` by the log loader).  When an entry has
+    no window average (e.g. only a single out-of-window seed run), the original
+    latest-snapshot score is preserved.
+    """
+    for entry in entries:
+        avg = getattr(entry, "_window_avg_score", None)
+        if avg is None:
+            continue
+        # Scale all per-strategy scores proportionally so relative strategy
+        # differences are kept, but the sort_strategy drives the primary rank.
+        # Use the current sort_strategy score as the baseline so the ratio is
+        # grounded in the correct strategy, even when log records contain mixed
+        # strategy values.
+        latest = entry.scores_by_strategy.get(sort_strategy)
+        if latest and latest > 0.0:
+            ratio = avg / latest
+            entry.scores_by_strategy = {
+                s: min(max(v * ratio, 0.0), 1.0)
+                for s, v in entry.scores_by_strategy.items()
+            }
+        else:
+            # Fallback: replace all strategy scores with the window avg directly.
+            entry.scores_by_strategy = {
+                s: avg for s in entry.scores_by_strategy
+            }
 
 
 def _attach_live_trends(
@@ -452,13 +508,18 @@ def leaderboard_live(
     window_hours: int = Query(default=24, ge=1, le=168),
     min_samples: int = Query(default=1, ge=1, le=1000),
     models: Optional[str] = Query(default=None),
+    ranking_basis: str = Query(default="window_avg", pattern="^(latest|window_avg)$"),
 ):
     entries = _load_latest_entries_from_logs(
         models_filter=_parse_models_filter(models),
         source_filter=SOURCE_LIVE,
         window_hours=window_hours,
         min_samples=min_samples,
+        sort_strategy=sort_strategy.lower() if ranking_basis == "window_avg" else None,
     )
+
+    if ranking_basis == "window_avg":
+        _apply_window_avg_scores(entries, sort_strategy.lower())
 
     _attach_live_trends(
         entries=entries,

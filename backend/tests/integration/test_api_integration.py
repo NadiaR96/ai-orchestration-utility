@@ -51,6 +51,70 @@ class TestAPIIntegration(unittest.TestCase):
         mock_process.assert_called_once()
 
     @patch('backend.api.run.orchestrator.process_task')
+    def test_run_task_with_reference_threads_dict_task(self, mock_process):
+        mock_process.return_value = self._make_bundle()
+
+        response = self.client.post(
+            "/run-task",
+            json={"input": "What is RAG?", "reference": "RAG stands for Retrieval Augmented Generation."}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        call_kwargs = mock_process.call_args
+        task_arg = call_kwargs.kwargs.get("task") or call_kwargs.args[0]
+        # reference must be passed as a dict so orchestrator threads it into evaluator
+        self.assertIsInstance(task_arg, dict)
+        self.assertEqual(task_arg["input"], "What is RAG?")
+        self.assertEqual(task_arg["reference"], "RAG stands for Retrieval Augmented Generation.")
+
+    @patch('backend.api.run.orchestrator.process_task')
+    def test_run_task_without_reference_passes_string_task(self, mock_process):
+        mock_process.return_value = self._make_bundle()
+
+        response = self.client.post("/run-task", json={"input": "What is RAG?"})
+
+        self.assertEqual(response.status_code, 200)
+        call_kwargs = mock_process.call_args
+        task_arg = call_kwargs.kwargs.get("task") or call_kwargs.args[0]
+        # no reference → plain string task (backward compatible)
+        self.assertIsInstance(task_arg, str)
+
+    @patch('backend.api.run.orchestrator.process_task')
+    def test_run_task_with_retrieval_none_threads_to_orchestrator(self, mock_process):
+        mock_process.return_value = self._make_bundle()
+
+        response = self.client.post(
+            "/run-task",
+            json={"input": "Test prompt", "retrieval": "none"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        call_kwargs = mock_process.call_args
+        self.assertEqual(call_kwargs.kwargs.get("retrieval"), "none")
+
+    @patch('backend.api.run.orchestrator.process_task')
+    def test_run_task_with_multiple_references_threads_list(self, mock_process):
+        mock_process.return_value = self._make_bundle()
+
+        response = self.client.post(
+            "/run-task",
+            json={
+                "input": "What is RAG?",
+                "reference": [
+                    "RAG combines retrieval and generation.",
+                    "Retrieval augmented generation grounds outputs in retrieved context.",
+                ],
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        call_kwargs = mock_process.call_args
+        task_arg = call_kwargs.kwargs.get("task") or call_kwargs.args[0]
+        self.assertIsInstance(task_arg, dict)
+        self.assertIsInstance(task_arg.get("reference"), list)
+        self.assertEqual(len(task_arg["reference"]), 2)
+
+    @patch('backend.api.run.orchestrator.process_task')
     def test_run_task_missing_input(self, mock_process):
         response = self.client.post("/run-task", json={})
         self.assertEqual(response.status_code, 422)
@@ -119,6 +183,93 @@ class TestAPIIntegration(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data["comparison"]["strategy"], "cost_aware")
+
+    @patch('backend.api.compare.Comparator')
+    @patch('backend.api.compare.Orchestrator')
+    def test_compare_with_reference_threads_dict_task(self, mock_orch_cls, mock_comp_cls):
+        bundle_a = self._make_bundle(output="Response A", model="small", score=0.8)
+        bundle_b = self._make_bundle(output="Response B", model="large", score=0.9)
+        mock_orch_cls.return_value.process_task.side_effect = [bundle_a, bundle_b]
+        mock_comp_cls.return_value.compare_many.return_value = ComparisonResult(
+            winner="large",
+            ranking=["large", "small"],
+            score_breakdown={"small": 0.8, "large": 0.9},
+            strategy="balanced"
+        )
+
+        response = self.client.post(
+            "/compare",
+            json={
+                "input": "Explain RAG",
+                "models": ["small", "large"],
+                "reference": "RAG stands for Retrieval Augmented Generation.",
+            }
+        )
+
+        self.assertEqual(response.status_code, 200)
+        # Both models should have been called with the same dict task (containing reference)
+        calls = mock_orch_cls.return_value.process_task.call_args_list
+        self.assertEqual(len(calls), 2)
+        for call in calls:
+            task_arg = call.kwargs.get("task") or call.args[0]
+            self.assertIsInstance(task_arg, dict)
+            self.assertEqual(task_arg["reference"], "RAG stands for Retrieval Augmented Generation.")
+
+    @patch('backend.api.compare.Comparator')
+    @patch('backend.api.compare.Orchestrator')
+    def test_compare_with_retrieval_none_threads_to_orchestrator(self, mock_orch_cls, mock_comp_cls):
+        bundle_a = self._make_bundle(output="Response A", model="small", score=0.8)
+        bundle_b = self._make_bundle(output="Response B", model="large", score=0.9)
+        mock_orch_cls.return_value.process_task.side_effect = [bundle_a, bundle_b]
+        mock_comp_cls.return_value.compare_many.return_value = ComparisonResult(
+            winner="large",
+            ranking=["large", "small"],
+            score_breakdown={"small": 0.8, "large": 0.9},
+            strategy="balanced",
+        )
+
+        response = self.client.post(
+            "/compare",
+            json={"input": "Compare this", "models": ["small", "large"], "retrieval": "none"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        calls = mock_orch_cls.return_value.process_task.call_args_list
+        self.assertEqual(len(calls), 2)
+        for call in calls:
+            self.assertEqual(call.kwargs.get("retrieval"), "none")
+
+    @patch('backend.api.compare.Comparator')
+    @patch('backend.api.compare.Orchestrator')
+    def test_compare_with_multiple_references_threads_list(self, mock_orch_cls, mock_comp_cls):
+        bundle_a = self._make_bundle(output="Response A", model="small", score=0.8)
+        bundle_b = self._make_bundle(output="Response B", model="large", score=0.9)
+        mock_orch_cls.return_value.process_task.side_effect = [bundle_a, bundle_b]
+        mock_comp_cls.return_value.compare_many.return_value = ComparisonResult(
+            winner="large",
+            ranking=["large", "small"],
+            score_breakdown={"small": 0.8, "large": 0.9},
+            strategy="balanced",
+        )
+
+        response = self.client.post(
+            "/compare",
+            json={
+                "input": "Explain RAG",
+                "models": ["small", "large"],
+                "reference": [
+                    "RAG combines retrieval and generation.",
+                    "Retrieval augmented generation grounds outputs in retrieved context.",
+                ],
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        calls = mock_orch_cls.return_value.process_task.call_args_list
+        self.assertEqual(len(calls), 2)
+        for call in calls:
+            task_arg = call.kwargs.get("task") or call.args[0]
+            self.assertIsInstance(task_arg.get("reference"), list)
 
     def test_compare_missing_input(self):
         response = self.client.post("/compare", json={})
@@ -321,6 +472,101 @@ class TestAPIIntegration(unittest.TestCase):
         self.assertEqual(data["items"][0]["model"], "small")
         self.assertIn("trend", data["items"][0])
         self.assertIn("direction", data["items"][0]["trend"])
+
+    @patch('backend.api.leaderboard._load_latest_entries_from_logs')
+    def test_leaderboard_live_window_avg_ranking(self, mock_load):
+        from backend.core.types import LeaderboardEntry
+
+        run_consistent = RunResult(
+            output="Good output",
+            model="consistent",
+            retrieval="rag",
+            latency=1.0,
+            cost=0.01,
+            context_used=True,
+            rag_context={},
+        )
+        run_flashy = RunResult(
+            output="Great output this time",
+            model="flashy",
+            retrieval="rag",
+            latency=1.0,
+            cost=0.01,
+            context_used=True,
+            rag_context={},
+        )
+        eval_consistent = EvaluationResult(metrics={"bert_score": 0.7}, score=0.7, strategy="balanced")
+        eval_flashy = EvaluationResult(metrics={"bert_score": 0.95}, score=0.95, strategy="balanced")
+
+        entry_consistent = LeaderboardEntry(
+            model="consistent",
+            run=run_consistent,
+            evaluation=eval_consistent,
+            scores_by_strategy={"balanced": 0.7, "quality": 0.7, "cost_aware": 0.7, "rag": 0.7},
+            ranks_by_strategy={},
+            narrative="",
+            latest_score=0.7,
+            sample_count=5,
+        )
+        entry_consistent._window_avg_score = 0.9  # type: ignore[attr-defined]
+
+        entry_flashy = LeaderboardEntry(
+            model="flashy",
+            run=run_flashy,
+            evaluation=eval_flashy,
+            scores_by_strategy={"balanced": 0.95, "quality": 0.95, "cost_aware": 0.95, "rag": 0.95},
+            ranks_by_strategy={},
+            narrative="",
+            latest_score=0.95,
+            sample_count=5,
+        )
+        entry_flashy._window_avg_score = 0.5  # type: ignore[attr-defined]
+
+        mock_load.return_value = [entry_consistent, entry_flashy]
+
+        response = self.client.get(
+            "/leaderboard/live?page=1&page_size=10&sort_strategy=balanced&ranking_basis=window_avg"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["mode"], "live")
+        self.assertEqual(data["items"][0]["model"], "consistent",
+                         "consistent should rank first (higher window avg despite lower latest score)")
+
+    @patch('backend.api.leaderboard._load_latest_entries_from_logs')
+    def test_leaderboard_live_latest_ranking_uses_snapshot(self, mock_load):
+        from backend.core.types import LeaderboardEntry
+
+        run_a = RunResult(output="A", model="a", retrieval="rag", latency=1.0, cost=0.01, context_used=True, rag_context={})
+        run_b = RunResult(output="B", model="b", retrieval="rag", latency=1.0, cost=0.01, context_used=True, rag_context={})
+        eval_a = EvaluationResult(metrics={"bert_score": 0.9}, score=0.9, strategy="balanced")
+        eval_b = EvaluationResult(metrics={"bert_score": 0.5}, score=0.5, strategy="balanced")
+
+        entry_a = LeaderboardEntry(
+            model="a", run=run_a, evaluation=eval_a,
+            scores_by_strategy={"balanced": 0.9, "quality": 0.9, "cost_aware": 0.9, "rag": 0.9},
+            ranks_by_strategy={}, narrative="", latest_score=0.9, sample_count=1,
+        )
+        entry_b = LeaderboardEntry(
+            model="b", run=run_b, evaluation=eval_b,
+            scores_by_strategy={"balanced": 0.5, "quality": 0.5, "cost_aware": 0.5, "rag": 0.5},
+            ranks_by_strategy={}, narrative="", latest_score=0.5, sample_count=1,
+        )
+        mock_load.return_value = [entry_a, entry_b]
+
+        response = self.client.get(
+            "/leaderboard/live?page=1&page_size=10&sort_strategy=balanced&ranking_basis=latest"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["items"][0]["model"], "a",
+                         "ranking_basis=latest should rank by snapshot scores")
+
+    def test_leaderboard_live_invalid_ranking_basis(self):
+        response = self.client.get("/leaderboard/live?ranking_basis=mean")
+        self.assertEqual(response.status_code, 422)
 
     def test_leaderboard_live_invalid_window(self):
         response = self.client.get("/leaderboard/live?page=1&page_size=10&window_hours=0")

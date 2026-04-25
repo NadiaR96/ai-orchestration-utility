@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 @dataclass
@@ -10,6 +10,10 @@ class RunResult:
     cost: float
     context_used: bool
     rag_context: Dict[str, Any]
+    prompt_tokens: int = 0
+    output_tokens: int = 0
+    total_tokens: int = 0
+    cost_per_1k_tokens: float = 0.0
     
 @dataclass
 class EvaluationResult:
@@ -24,10 +28,12 @@ class RunBundle:
     
 @dataclass
 class ComparisonResult:
-    winner: str
+    winner: Optional[str]
     ranking: List[str]
     score_breakdown: Dict[str, float]
     strategy: str
+    tied_winners: List[str] = field(default_factory=list)
+    selection_reason: Optional[str] = None
     
 @dataclass
 class ExecutionResponse:
@@ -46,6 +52,8 @@ class LeaderboardEntry:
     ranks_by_strategy: Dict[str, int]
     narrative: str
     trend: Optional[Dict[str, Any]] = None
+    latest_score: Optional[float] = None
+    sample_count: int = 0
 
 
 @dataclass
